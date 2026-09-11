@@ -1,0 +1,14 @@
+; ============================================
+; platform/win32.inc - Win32-specific state
+; Only included by platform/win32/*.asm
+; ============================================
+
+; --- Win32 window state ---
+struct CGXWin32State
+    .hwndresq 1
+    .hInstance          resq 1
+    .hdc                resq 1
+    .msg                resb 48 ; MSG struct
+    .shouldClose        resb 1
+    .bmi                resb 44 ; BITMAPINFOHEADER (40) + 4 padding
+endstruc

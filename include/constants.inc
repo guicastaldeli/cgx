@@ -15,3 +15,14 @@ CGX_TRIANGLES       equ 2
 CGX_STATIC         equ 0
 CGX_DYNAMIC        equ 1
 CGX_STREAM         equ 2
+
+; --- Attribute types ---
+CGX_FLOAT          equ 0
+CGX_UINT           equ 1
+CGX_UBYTE          equ 2
+
+; --- Errors ---
+CGX_OK             equ 0
+CGX_ERR_NOMEM      equ 1
+CGX_ERR_WINDOW     equ 2
+CGX_ERR_INVALID    equ 3
