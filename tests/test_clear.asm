@@ -15,6 +15,7 @@ extern CGXShouldClose
 extern CGXSetClearColor
 extern CGXClear
 extern CGXSwapBuffers
+extern MessageBoxA
 
 section .data
     title db "CGX Test - Clear", 0
@@ -22,6 +23,10 @@ section .data
     cG dd 0.2
     cB dd 0.4
     cA dd 1.0
+
+    msg_init db "CGXInit succeeded, entering loop", 0
+    msg_closing db "ShouldClose returned 1", 0
+    msg_title db "CGX Debug", 0
 
 section .text
 
@@ -45,15 +50,28 @@ main:
     movss xmm3, [rel cA]
     call CGXSetClearColor
 
+    xor rcx, rcx
+    lea rdx, [rel msg_init]
+    lea r8, [rel msg_title]
+    mov r9d, 0
+    call MessageBoxA
+
 .loop:
     call CGXPollEvents
     call CGXShouldClose
     cmp eax, 1
-    je .done
+    jne .keep_going
 
-    mov ecx, 0x00004000     ; CGX_COLOR_BIT
+    xor rcx, rcx
+    lea rdx, [rel msg_closing]
+    lea r8, [rel msg_title]
+    mov r9d, 0
+    call MessageBoxA
+    jmp .done
+
+.keep_going:
+    mov ecx, 0x00004000
     call CGXClear
-
     call CGXSwapBuffers
     jmp .loop
 
@@ -64,7 +82,7 @@ main:
     pop rbp
     ret
 
-error:
+.error:
     mov eax, 1
     mov rsp, rbp
     pop rbp

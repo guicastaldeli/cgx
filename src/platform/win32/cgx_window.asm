@@ -158,7 +158,7 @@ _cgxWin32CreateWindow:
 _cgxWin32DestroyWindow:
     push rbp
     mov rbp, rsp
-    sub rsp, 32
+    sub rsp, 48
 
     mov rcx, [rel _cgxWin32State + CGXWin32State.hwnd]
     test rcx, rcx
@@ -177,7 +177,7 @@ _cgxWin32DestroyWindow:
 _cgxWin32PollEvents:
     push rbp
     mov rbp, rsp
-    sub rsp, 32
+    sub rsp, 48
 
 .loop:
     lea rcx, [rel _cgxWin32State + CGXWin32State.msg]
@@ -250,7 +250,7 @@ _cgxWin32GetHeight:
 _cgxWin32WndProc:
     push rbp
     mov rbp, rsp
-    sub rsp, 32
+    sub rsp, 48
 
     ; rcx = hWnd
     ; rdx = uMsg

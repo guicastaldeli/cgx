@@ -58,4 +58,3 @@ echo.
 echo ========================================
 echo CGX library built successfully!
 echo ========================================
-pause

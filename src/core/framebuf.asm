@@ -8,16 +8,17 @@ default rel
 %include "constants.inc"
 %include "structs.inc"
 
-global _cgxCoreInitFramebuffer
-global _cgxCoreFreeFramebuffer
-global _cgxCoreClear
-
 extern VirtualAlloc
 extern VirtualFree
+extern MessageBoxA
 
 extern _cgxCoreState
 extern _cgxCoreGetWidth
 extern _cgxCoreGetHeight
+
+global _cgxCoreInitFramebuffer
+global _cgxCoreFreeFramebuffer
+global _cgxCoreClear
 
 MEM_COMMIT          equ 0x00001000
 MEM_RESERVE         equ 0x00002000
@@ -26,6 +27,9 @@ PAGE_READWRITE      equ 0x04
 
 CGX_COLOR_BIT       equ 0x00004000
 
+section .data
+    fb_debug_title db "Framebuffer Debug", 0
+    fb_debug_msg db "Size 0x00000000", 0
 section .text
 
 ; --------------------------------------------
@@ -48,10 +52,10 @@ _cgxCoreInitFramebuffer:
     mov [rel _cgxCoreState + CGXState.height], edx
 
     ; Compute Size = w * h * 4
-    mov eax, ecx
-    imul eax, edx
+    mov eax, r12d
+    imul eax, ebx
     shl eax, 2
-    mov r12d, eax ; size
+    mov r12, rax ; size
     mov [rel _cgxCoreState + CGXState.fbSize], rax
 
     ; VirtualAlloc(NULL, size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE)
@@ -78,6 +82,38 @@ _cgxCoreInitFramebuffer:
     jmp .done
 
 .fail:
+    push rax
+    push rdi
+    push rcx
+    push rdx
+
+    mov eax, r12d
+    lea rdi, [rel fb_debug_msg + 9]
+    mov ecx, 8
+.hexloop:
+    rol eax, 4
+    mov edx, eax
+    and edx, 0x0F
+    cmp edx, 10
+    jb .digit
+    add edx, 'A' - 10 - '0'
+.digit:
+    add edx, '0'
+    mov [rdi], dl
+    inc rdi
+    dec ecx
+    jnz .hexloop
+
+    xor rcx, rcx
+    lea rdx, [rel fb_debug_msg]
+    lea r8, [rel fb_debug_title]
+    mov r9d, 0
+    call MessageBoxA
+
+    pop rdx
+    pop rcx
+    pop rdi
+    pop rax
     xor eax, eax
 
 .done:

@@ -70,7 +70,7 @@ _cgxWin32BlitFramebuffer:
     push rbx
     push r12
     push r13
-    sub rsp, 128
+    sub rsp, 136
 
     ; Get framebuffer pointer + dims
     call _cgxCoreGetFramebuffer
@@ -109,7 +109,7 @@ _cgxWin32BlitFramebuffer:
     mov rdx, [rel _cgxWin32State + CGXWin32State.hdc]
     call ReleaseDC
 
-    add rsp, 128
+    add rsp, 136
     pop r13
     pop r12
     pop rbx
