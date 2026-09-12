@@ -42,6 +42,17 @@ WM_DESTROY              equ 0x0002
 PM_REMOVE               equ 0x0001
 NULL                    equ 0
 
+; --- Keys ---
+WM_KEYDOWN              equ 0x0100
+WM_KEYUP                equ 0x0101
+WM_MOUSEMOVE            equ 0x0200
+WM_LBUTTONDOWN          equ 0x0201
+WM_LBUTTONUP            equ 0x0202
+WM_RBUTTONDOWN          equ 0x0204
+WM_RBUTTONUP            equ 0x0205
+WM_MBUTTONDOWN          equ 0x0207
+WM_MBUTTONUP            equ 0x0208
+
 section .data
     _win32ClassName db "CGXWindowClass", 0
 
@@ -264,6 +275,26 @@ _cgxWin32WndProc:
     cmp edx, WM_DESTROY
     je .onDestroy
 
+    ; Input
+    cmp edx, WM_KEYDOWN
+    je .onKeyDown
+    cmp edx, WM_KEYUP
+    je .onKeyUp
+    cmp edx, WM_MOUSEMOVE
+    je .onMouseMove
+    cmp edx, WM_LBUTTONDOWN
+    je .onLButtonDown
+    cmp edx, WM_LBUTTONUP
+    je .onLButtonUp
+    cmp edx, WM_RBUTTONDOWN
+    je .onRButtonDown
+    cmp edx, WM_RBUTTONUP
+    je .onRButtonUp
+    cmp edx, WM_MBUTONDOWN
+    je .onMButtonDown
+    cmp edx, WM_MBUTTONUP
+    je .onMButtonUp
+
     ; Default handling
     mov rcx, [rsp + 0]
     mov rdx, [rsp + 8]
@@ -276,6 +307,62 @@ _cgxWin32WndProc:
     mov byte [rel _cgxWin32State + CGXWin32State.shouldClose], 1
     xor rcx, rcx
     call PostQuitMessage
+    xor eax, eax
+
+.onKeyDown:
+    ; wParam (r8): virtual key code
+    movzx eax, r8b
+    mov byte [rel _cgx32State + CGX32State.keys + rax], 1
+    xor eax, eax
+    jmp .finish
+
+.onKeyUp:   
+    movzx eax, r8b
+    mov byte [rel _cgxWin32State + CGXWin32State.keys + rax], 0
+    xor eax, eax
+    jmp .finish
+
+.onMouseMove:
+    ; lParam (r9): low word = X, high word = Y
+    mov eax, r9d
+    and eax, 0xFFFF
+    mov [rel _cgxWin32State + CGXWinState.mouseX], eax
+
+    mov eax, r9d
+    shr eax, 16
+    and eax, 0xFFFF
+    mov [rel _cgxWin32State + CGXWinState.mouseY], eax
+
+    xor eax, eax
+    jmp .finish
+
+.onLButtonDown:
+    mov byte [rel _cgxWin32State + CGXWin32State.mouseButtons + 0], 1
+    xor eax, eax
+    jmp .finish
+
+.onLButtonUp:
+    mov byte [rel _cgxWin32State + CGXWin32State.mouseButtons + 0], 0
+    xor eax, eax
+    jmp .finish
+
+.onRButtonDown:
+    mov byte [rel _cgxWin32State + CGXWin32State.mouseButtons + 2], 1
+    xor eax, eax
+    jmp .finish
+
+.onRButtonUp:
+    mov byte [rel _cgxWin32State + CGXWin32State.mouseButtons + 2], 0
+    xor eax, eax
+    jmp .finish
+
+.onMButtonDown:
+    mov byte [rel _cgxWin32State + CGXWin32State.mouseButtons + 1], 1
+    xor eax, eax
+    jmp .finish
+
+.onMButtonUp:
+    mov byte [rel _cgxWin32State + CGXWin32State.mouseButtons + 1], 0
     xor eax, eax
 
 .finish:

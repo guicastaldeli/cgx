@@ -18,3 +18,9 @@ extern CGXSetWindowTitle
 extern CGXSetClearColor
 extern CGXClear
 extern CGXSwapBuffers
+
+; --- Input ---
+extern CGXGetKey
+extern CGXGetMouseX
+extern CGXGetMouseY
+extern CGXGetMouseButton
