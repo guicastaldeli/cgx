@@ -9,7 +9,6 @@ set SRC=%ROOT%\src
 set INC=%ROOT%\include
 set TESTS=%ROOT%\tests
 
-:: Build CGX library first
 call "%ROOT%\build\build.bat"
 if errorlevel 1 (
     echo [ERROR] CGX library build failed!
