@@ -11,4 +11,9 @@ struc CGXWin32State
     .msg                resb 48 ; MSG struct
     .shouldClose        resb 1
     .bmi                resb 44 ; BITMAPINFOHEADER (40) + 4 padding
+    .keys               resb 256
+    .mouseX             resd 1
+    .mouseY             resd 1
+    .mouseButtons       resb 3
+    .padding            resb 1
 endstruc

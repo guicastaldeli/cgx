@@ -30,6 +30,7 @@ CGX_COLOR_BIT       equ 0x00004000
 section .data
     fb_debug_title db "Framebuffer Debug", 0
     fb_debug_msg db "Size 0x00000000", 0
+    
 section .text
 
 ; --------------------------------------------
