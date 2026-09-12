@@ -4,6 +4,9 @@
 
 default rel
 
+%include "structs.inc"
+%include "platform/win32.inc"
+
 extern GetModuleHandleA
 extern RegisterClassExA
 extern CreateWindowExA

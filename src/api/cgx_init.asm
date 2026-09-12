@@ -4,6 +4,9 @@
 
 default rel
 
+%include "structs.inc"
+%include "platform/win32.inc"
+
 extern _cgxWin32CreateWindow
 extern _cgxWin32DestroyWindow
 extern _cgxWin32InitBlit

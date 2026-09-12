@@ -5,6 +5,9 @@
 
 default rel
 
+%include "constants.inc"
+%include "structs.inc"
+
 global _cgxCoreInitFramebuffer
 global _cgxCoreFreeFrameBuffer
 global _cgxCoreClear

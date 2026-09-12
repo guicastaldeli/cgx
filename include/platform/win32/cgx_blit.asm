@@ -5,6 +5,10 @@
 
 default rel
 
+%include "constants.inc"
+%include "structs.inc"
+%include "platform/win32.inc"
+
 extern GetDC
 extern ReleaseDC
 extern StretchDIBits

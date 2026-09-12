@@ -4,6 +4,8 @@
 
 default rel
 
+%include "structs.inc"
+
 global _cgxCoreState            ; the CGXState struct instance...
 global _cgxCoreSetDimensions
 global _cgxCoreSetClearColor

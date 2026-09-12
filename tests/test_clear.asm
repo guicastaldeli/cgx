@@ -4,6 +4,8 @@
 
 default rel
 
+%include "constants.inc"
+
 global main
 
 extern CGXInit

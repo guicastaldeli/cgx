@@ -7,6 +7,9 @@
 
 default rel
 
+%include "constants.inc"
+%include "structs.inc"
+
 extern _cgxCoreSetClearColor
 extern _cgxCoreClear
 extern _cgxCoreGetWidth
