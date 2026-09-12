@@ -4,8 +4,8 @@
 ; ============================================
 
 ; --- Win32 window state ---
-struct CGXWin32State
-    .hwndresq 1
+struc CGXWin32State
+    .hwnd               resq 1
     .hInstance          resq 1
     .hdc                resq 1
     .msg                resb 48 ; MSG struct

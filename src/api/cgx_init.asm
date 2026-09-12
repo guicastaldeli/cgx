@@ -25,13 +25,13 @@ section .text
 ; --------------------------------------------
 CGXInit:
     push rbp
-    mov rdp, rsp
+    mov rbp, rsp
     sub rsp, 32
 
     ; Save args
     mov r10d, ecx
     mov r11d, edx
-    mov r12 r8
+    mov r12, r8
 
     ; Create Window
     call _cgxWin32CreateWindow
@@ -62,7 +62,7 @@ CGXInit:
 ; --------------------------------------------
 ; CGXShutdown
 ; --------------------------------------------
-CGXShutDown:
+CGXShutdown:
     push rbp
     mov rbp, rsp
     sub rsp, 32

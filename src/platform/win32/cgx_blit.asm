@@ -18,8 +18,7 @@ extern _cgxWin32GetHWND
 extern _cgxCoreGetFramebuffer
 extern _cgxCoreGetWidth
 extern _cgxCoreGetHeight
-
-extern CGXWin32State
+extern _cgxWin32State
 
 global _cgxWin32InitBlit
 global _cgxWin32BlitFramebuffer
@@ -38,7 +37,7 @@ _cgxWin32InitBlit:
     mov rbp, rsp
     push rbx
 
-    lea rbx, [rel _cgxWin32State + CGXWin32.bmi]
+    lea rbx, [rel _cgxWin32State + CGXWin32State.bmi]
 
     call _cgxCoreGetWidth
     mov ecx, eax
@@ -54,12 +53,11 @@ _cgxWin32InitBlit:
     mov dword [rbx + 20], 0
     mov dword [rbx + 24], 0
     mov dword [rbx + 28], 0
-    mov dword [rbx + 28], 0
     mov dword [rbx + 32], 0
     mov dword [rbx + 36], 0
 
     pop rbx
-    mov rbp
+    pop rbp
     ret
 
 ; --------------------------------------------
@@ -83,7 +81,7 @@ _cgxWin32BlitFramebuffer:
     mov ebx, eax
 
     ; Get HDC
-    mov rcx, [rel _cgxWin32 + CGXWin32State.hwnd]
+    mov rcx, [rel _cgxWin32State + CGXWin32State.hwnd]
     call GetDC
     mov [rel _cgxWin32State + CGXWin32State.hdc], rax
 
@@ -99,7 +97,7 @@ _cgxWin32BlitFramebuffer:
     mov [rsp + 56], r13                         ; SrcWidth
     mov [rsp + 64], rbx                         ; SrcHeight
     mov [rsp + 72], r12                         ; lpBits
-    lea rax, [rel _cgxWin32State + CGXWinState.bmi]
+    lea rax, [rel _cgxWin32State + CGXWin32State.bmi]
     mov [rsp + 80], rax                         ; lpbmi
     mov qword [rsp + 88], DIB_RGB_COLORS        ; iUsage
     mov qword [rsp + 96], SRCCOPY               ; rop

@@ -4,6 +4,7 @@
 
 default rel
 
+%include "constants.inc"
 %include "structs.inc"
 %include "platform/win32.inc"
 
@@ -21,9 +22,6 @@ extern PostQuitMessage
 extern DestroyWindow
 extern GetClientRect
 
-extern CGXWin32State
-extern CGXWin32State_size
-
 global _cgxWin32CreateWindow
 global _cgxWin32DestroyWindow
 global _cgxWin32PollEvents
@@ -33,6 +31,7 @@ global _cgxWin32GetDC
 global _cgxWin32GetWidth
 global _cgxWin32GetHeight
 global _cgxWin32GetState
+global _cgxWin32State
 
 ; --- Constants ---
 CS_HREDRAW              equ 0x0002
@@ -47,7 +46,7 @@ section .data
     _win32ClassName db "CGXWindowClass", 0
 
 section .bss
-    _cgxWin32State resb CGXWin32_size
+    _cgxWin32State resb CGXWin32State_size
 
 section .text
 
@@ -95,7 +94,7 @@ _cgxWin32CreateWindow:
     mov qword [rdi + 48], 0         ; hbrBackground
     mov qword [rdi + 56], 0         ; lpszMenuName
     lea rax, [rel _win32ClassName]
-    mov qword [rdi, 64], rax        ; lpszClassName
+    mov qword [rdi + 64], rax       ; lpszClassName
     mov qword [rdi + 72], 0         ; hIconSm
 
     mov rcx, rdi
@@ -193,7 +192,7 @@ _cgxWin32PollEvents:
     lea rcx, [rel _cgxWin32State + CGXWin32State.msg]
     call TranslateMessage
 
-    lea rcx, [rel _cgxWin32State + CGXWin32.msg]
+    lea rcx, [rel _cgxWin32State + CGXWin32State.msg]
     call DispatchMessageA
     jmp .loop
 
@@ -207,7 +206,7 @@ _cgxWin32PollEvents:
 ; Output: eax = 1 if should close
 ; --------------------------------------------
 _cgxWin32ShouldClose:
-    movzx eax, byte [rel _cgxWin32State + CGXWin32.shouldClose]
+    movzx eax, byte [rel _cgxWin32State + CGXWin32State.shouldClose]
     ret
 
 ; --------------------------------------------

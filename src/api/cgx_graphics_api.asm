@@ -13,7 +13,7 @@ default rel
 extern _cgxCoreSetClearColor
 extern _cgxCoreClear
 extern _cgxCoreGetWidth
-extern _cgxCoreHeight
+extern _cgxCoreGetHeight
 extern _cgxWin32BlitFramebuffer
 extern _cgxWin32PollEvents
 extern _cgxWin32ShouldClose

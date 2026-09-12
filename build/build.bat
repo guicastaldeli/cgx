@@ -23,7 +23,7 @@ if errorlevel 1 (
 
 echo.
 echo [Compiling] core...
-for %%f in ("%SRC%\core\*.asm") do (
+for %%f in (%SRC%\core\*.asm) do (
     echo   Compiling %%~nf.asm...
     nasm -f win64 -i "%INC%/" "%%f" -o "%BUILD%\core\%%~nf.obj"
     if errorlevel 1 (
@@ -34,7 +34,7 @@ for %%f in ("%SRC%\core\*.asm") do (
 
 echo.
 echo [Compiling] api...
-for %%f in ("%SRC%\api\*.asm") do (
+for %%f in (%SRC%\api\*.asm) do (
     echo   Compiling %%~nf.asm...
     nasm -f win64 -i "%INC%/" "%%f" -o "%BUILD%\api\%%~nf.obj"
     if errorlevel 1 (
@@ -45,7 +45,7 @@ for %%f in ("%SRC%\api\*.asm") do (
 
 echo.
 echo [Compiling] platform...
-for %%f in ("%SRC%\platform\win32\*.asm") do (
+for %%f in (%SRC%\platform\win32\*.asm) do (
     echo   Compiling %%~nf.asm...
     nasm -f win64 -i "%INC%/" -i "%INC%\platform/" "%%f" -o "%BUILD%\platform\%%~nf.obj"
     if errorlevel 1 (

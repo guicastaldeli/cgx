@@ -13,9 +13,6 @@ global _cgxCoreGetFramebuffer
 global _cgxCoreGetWidth
 global _cgxCoreGetHeight
 
-extern CGXState_size
-extern CGXState
-
 ; --- State instance ---
 section .bss
     _cgxCoreState   resb CGXState_size
@@ -26,7 +23,7 @@ section .text
 ; _cgxCoreSetDimensions
 ; Input: ecx = width, edx = height
 ; --------------------------------------------
-_cgxCoreDimensions:
+_cgxCoreSetDimensions:
     mov [rel _cgxCoreState + CGXState.width], ecx
     mov [rel _cgxCoreState + CGXState.height], edx
     ret
@@ -46,7 +43,7 @@ _cgxCoreSetClearColor:
 ; _cgxCoreGetFramebuffer
 ; Output: rax = framebuffer pointer
 ; --------------------------------------------
-_cgxCoreFramebuffer:
+_cgxCoreGetFramebuffer:
     mov rax, [rel _cgxCoreState + CGXState.framebuffer]
     ret
 
@@ -54,7 +51,7 @@ _cgxCoreFramebuffer:
 ; _cgxCoreGetWidth
 ; Output: eax = width
 ; --------------------------------------------
-_cgxCoreGetWidth
+_cgxCoreGetWidth:
     mov eax, [rel _cgxCoreState + CGXState.width]
     ret
 
@@ -62,6 +59,6 @@ _cgxCoreGetWidth
 ; _cgxCoreGetWidth
 ; Output: eax = height
 ; --------------------------------------------
-_cgxCoreGetHeight
+_cgxCoreGetHeight:
     mov eax, [rel _cgxCoreState + CGXState.height]
     ret

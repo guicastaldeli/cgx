@@ -3,8 +3,8 @@
 ; ============================================
 
 ; --- Clear Masks ---
-CGX_COLOR_BIT       equ 0x0004000
-CGX_DEPTH_BUT       equ 0x0000100
+CGX_COLOR_BIT       equ 0x00004000
+CGX_DEPTH_BIT       equ 0x00000100
 
 ; --- Primitives ---
 CGX_POINTS          equ 0

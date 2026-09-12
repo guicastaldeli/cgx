@@ -9,7 +9,7 @@ default rel
 %include "structs.inc"
 
 global _cgxCoreInitFramebuffer
-global _cgxCoreFreeFrameBuffer
+global _cgxCoreFreeFramebuffer
 global _cgxCoreClear
 
 extern VirtualAlloc
@@ -19,13 +19,10 @@ extern _cgxCoreState
 extern _cgxCoreGetWidth
 extern _cgxCoreGetHeight
 
-extern CGXState
-extern CGXState_size
-
 MEM_COMMIT          equ 0x00001000
 MEM_RESERVE         equ 0x00002000
 MEM_RELEASE         equ 0x00008000
-MEM_READWRITE       equ 0x04
+PAGE_READWRITE      equ 0x04
 
 CGX_COLOR_BIT       equ 0x00004000
 
@@ -37,7 +34,7 @@ section .text
 ; Output: eax = 1 ok, 0 fail
 ; --------------------------------------------
 _cgxCoreInitFramebuffer:
-    push rbp,
+    push rbp
     mov rbp, rsp
     push rbx
     push r12
