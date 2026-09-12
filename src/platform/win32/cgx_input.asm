@@ -23,7 +23,8 @@ section .text
 ; Output: eax = 0 (released) or 1 (pressed)
 ; --------------------------------------------
 _cgxWin32GetKey:
-    movzx eax, byte [rel _cgxWin32State + CGXWin32State.keys + rcx]
+    lea r10, [rel _cgxWin32State]
+    movzx eax, byte [r10 + CGXWin32State.keys + rcx]
     ret
 
 ; --------------------------------------------
@@ -47,10 +48,11 @@ _cgxWin32GetMouseY:
 ; Input: ecx = button index (0=left, 1=middle, 2=right)
 ; Output: eax = 0 (released) or 1 (pressed)
 ; --------------------------------------------
-_cgxWin32MouseButton:
+_cgxWin32GetMouseButton:
     cmp ecx, 3
     jae .invalid
-    movzx eax, byte [rel _cgxWin32State + CGXWin32State.mouseButtons + rcx]
+    lea r10, [rel _cgxWin32State]
+    movzx eax, byte [r10 + CGXWin32State.mouseButtons + rcx]
     ret
 
 .invalid:

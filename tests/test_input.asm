@@ -19,10 +19,12 @@ extern CGXGetKey
 extern CGXGetMouseX
 extern CGXGetMouseY
 extern CGXGetMouseButton
+extern CGXSetWindowTitle
 extern MessageBoxA
 
 section .data
     title db "CGX Test - Input", 0
+    title_buf db "CGX Input - Input / X=000 Y=000", 0
     cR dd 0.1
     cG dd 0.1
     cB dd 0.1
@@ -38,11 +40,11 @@ section .text
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 40
+    sub rsp, 32
 
     ; Init window + graphics
     mov rcx, 800
-    mov rcx, 600
+    mov rdx, 600
     lea r8, [rel title]
     call CGXInit
     cmp eax, 0
@@ -84,11 +86,25 @@ main:
 
     xor rcx, rcx
     lea rdx, [rel msg_click]
-    lea r8, [r8 msg_click_title]
+    lea r8, [rel msg_click_title]
     mov r9d, 0
     call MessageBoxA
 
 .render:
+    ; Get mouse X
+    call CGXGetMouseX
+    lea rdi, [rel title_buf + 22]
+    call write3digits
+
+    ; Get mouse Y
+    call CGXGetMouseY
+    lea rdi, [rel title_buf + 28]
+    call write3digits
+
+    ; Update window title
+    lea rcx, [rel title_buf]
+    call CGXSetWindowTitle
+
     mov ecx, 0x00004000
     call CGXClear
     call CGXSwapBuffers
@@ -105,4 +121,30 @@ main:
     mov eax, 1
     mov rsp, rbp
     pop rbp
+    ret
+
+; Helper: convert eax (0-999) to 3 ASCII digits at [rdi]
+; Input: eax = value, rdi = destination
+write3digits:
+    push rbx
+    mov ebx, 100
+    xor edx, edx
+    div ebx
+    add al, '0'
+    mov [rdi], al
+    inc rdi
+
+    mov eax, edx
+    mov ebx, 10
+    xor edx, edx
+    div ebx
+    add al, '0'
+    mov [rdi], al
+    inc rdi
+
+    mov eax, edx
+    add al, '0'
+    mov [rdi], al
+
+    pop rbx
     ret

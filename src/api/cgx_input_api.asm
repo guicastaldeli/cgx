@@ -31,7 +31,7 @@ CGXGetKey:
 ; CGXGetMouseX
 ; Output: eax = mouse X in pixels
 ; --------------------------------------------
-CHXGetMouseX:
+CGXGetMouseX:
     jmp _cgxWin32GetMouseX
 
 ; --------------------------------------------

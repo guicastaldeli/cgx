@@ -290,7 +290,7 @@ _cgxWin32WndProc:
     je .onRButtonDown
     cmp edx, WM_RBUTTONUP
     je .onRButtonUp
-    cmp edx, WM_MBUTONDOWN
+    cmp edx, WM_MBUTTONDOWN
     je .onMButtonDown
     cmp edx, WM_MBUTTONUP
     je .onMButtonUp
@@ -312,13 +312,15 @@ _cgxWin32WndProc:
 .onKeyDown:
     ; wParam (r8): virtual key code
     movzx eax, r8b
-    mov byte [rel _cgx32State + CGX32State.keys + rax], 1
+    lea r10, [rel _cgxWin32State]
+    mov byte [r10 + CGXWin32State.keys + rax], 1
     xor eax, eax
     jmp .finish
 
 .onKeyUp:   
     movzx eax, r8b
-    mov byte [rel _cgxWin32State + CGXWin32State.keys + rax], 0
+    lea r10, [rel _cgxWin32State]
+    mov byte [r10 + CGXWin32State.keys + rax], 0
     xor eax, eax
     jmp .finish
 
@@ -326,12 +328,12 @@ _cgxWin32WndProc:
     ; lParam (r9): low word = X, high word = Y
     mov eax, r9d
     and eax, 0xFFFF
-    mov [rel _cgxWin32State + CGXWinState.mouseX], eax
+    mov [rel _cgxWin32State + CGXWin32State.mouseX], eax
 
     mov eax, r9d
     shr eax, 16
     and eax, 0xFFFF
-    mov [rel _cgxWin32State + CGXWinState.mouseY], eax
+    mov [rel _cgxWin32State + CGXWin32State.mouseY], eax
 
     xor eax, eax
     jmp .finish
