@@ -110,52 +110,54 @@ _cgxCoreBufferCreate:
     ; rdi = free slot
     ; rbx = pool base
     ; eax = slot index
+    ; r12 = data ptr (src)
+    ; r13 = size
+    ; r14d = usage
+    ; r15d = type
+
+    mov rbx, rdi
+
+    ; Save nextBufferId
+    mov edx, [rel _cgxCoreState + CGXState.nextBufferId]
+    push rdx
 
     ; Allocate data buffer
-    push rax            ; save slot index
-    push rdi            ; save slot ptr
-
     xor rcx, rcx
-    mov rdx, r13        ; size
+    mov rdx, r13
     mov r8d, MEM_COMMIT | MEM_RESERVE
     mov r9d, PAGE_READWRITE
     call VirtualAlloc
     test rax, rax
     jz .alloc_fail
 
-    mov r8, rax         ; r8 = new data ptr
+    mov r8, rax
 
-    ; Copy data
-    mov rcx, r12        ; src
-    mov rdx, r8         ; dst
-    mov rdi, r8
-    mov rsi, r12
-    mov rcx, r13        ; count bytes
+    ; Copt src -> dst
+    mov rdi, r8         ; dst
+    mov rsi, r12        ; src
+    mov rcx, r13        ; byte count
     rep movsb
 
-    ; Restore slot ptr
-    pop rdi
-    pop rax
+    ; Restore nextBufferId
+    pop rdx
 
-    ; Fill slot
-    mov edx, [rel _cgxCoreState + CGXState.nextBufferId]
-    mov [rdi + Buffer.id], edx
-    mov [rdi + Buffer.data], r8
-    mov [rdi + Buffer.size], r13
-    mov [rdi + Buffer.usage], r14d
-    mov [rdi + Buffer.type], r15d
-    mov byte [rdi + Buffer.inUse], 1
+    ; Fill slot (rbx = slot ptr, r8 = data ptr, rdx = id)
+    mov [rbx + Buffer.id], edx
+    mov [rdx + Buffer.data], r8
+    mov [rbx + Buffer.size], r13
+    mov [rbx + Buffer.usage], r14d
+    mov [rbx + Buffer.type], r15d
+    mov byte [rbx + Buffer.inUse], 1
 
-    ; Increment counter and count
+    ; Increment id and count
     inc dword [rel _cgxCoreState + CGXState.nextBufferId]
     inc dword [rel _cgxCoreState + CGXState.bufferCount]
 
-    mov eax, edx       ; return id
+    mov eax, edx        ; return id
     jmp .done
 
 .alloc_fail:
-    pop rdi
-    pop rax
+    pop rdx
     jmp .fail
 .fail:
     xor eax, eax
