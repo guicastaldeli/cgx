@@ -6,6 +6,8 @@ default rel
 
 %include "constants.inc"
 
+global main
+
 extern CGXInit
 extern CGXShutdown
 extern CGXPollEvents
@@ -20,7 +22,7 @@ extern CGXGetTimeDelta
 
 section .data
     title db "CGX Test - Time", 0
-    title_buf db "FPS=000 Frame=0000000000", 0
+    title_buf db "FPS=0000 Frame=0000000000", 0
 
     cR dd 0.1
     cG dd 0.1
@@ -32,17 +34,25 @@ section .data
 
 section .bss
     frames              resd 1
-    fpsTime             resd 1
+    fpsTimer            resq 1
     currentFps          resd 1
 
 section .text
 
 ; --------------------------------------------
-; write3digits
-; Input: eax = value (0-999), rdi = destination
+; write4digits
+; Input: eax = value (0-9999), rdi = destination
 ; --------------------------------------------
-write3digits:
+write4digits:
     push rbx
+    mov ebx, 1000
+    xor edx, edx
+    div ebx
+    add al, '0'
+    mov [rdi], al
+    inc rdi
+
+    mov eax, edx
     mov ebx, 100
     xor edx, edx
     div ebx
@@ -54,7 +64,7 @@ write3digits:
     mov ebx, 10
     xor edx, edx
     div ebx
-    mov al, '0'
+    add al, '0'
     mov [rdi], al
     inc rdi
 
@@ -146,22 +156,22 @@ main:
     cvttsd2si rax, xmm0
     mov [rel fpsTimer], rax
 
-.draw
-    ; Update title: "FPS=### Frame=##########"
+.draw:
+    ; Update title: "FPS=#### Frame=##########"
     mov eax, [rel currentFps]
     lea rdi, [rel title_buf + 4]
-    call write3digits
+    call write4digits
 
     ; Frame count (10 digits) - placeholder
-    mov rax, [rel frames]
-    lea rdi, [rel title_buf + 16]
+    mov eax, [rel frames]
+    lea rdi, [rel title_buf + 15]
     call write10digits
 
     lea rcx, [rel title_buf]
     call CGXSetWindowTitle
 
     ; Clear + present
-    mov eax, 0x000040000
+    mov ecx, 0x00004000
     call CGXClear
     call CGXSwapBuffers
     jmp .loop

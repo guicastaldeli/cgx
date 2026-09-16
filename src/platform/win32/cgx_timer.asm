@@ -7,7 +7,7 @@ default rel
 
 %include "platform/win32.inc"
 
-extern QueryPermormanceCounter
+extern QueryPerformanceCounter
 extern QueryPerformanceFrequency
 
 extern _cgxWin32State
@@ -33,7 +33,7 @@ _cgxWin32TimerInit:
     sub rsp, 32
 
     ; QueryPerformanceFrequency(&freq)
-    lea rcx, [rel _cgxWin32State + CGXWin32State.prefFreq]
+    lea rcx, [rel _cgxWin32State + CGXWin32State.perfFreq]
     call QueryPerformanceFrequency
     test eax, eax
     jz .fail
@@ -90,7 +90,7 @@ _cgxWin32GetTime:
     cvtsi2sd xmm0, rax
 
     ; seconds = elapsed / freq
-    cvtsi2sd xmm1, qword [rel _cgxWin32State + CGXWin32State.prefFreq]
+    cvtsi2sd xmm1, qword [rel _cgxWin32State + CGXWin32State.perfFreq]
     divsd xmm0, xmm1
 
     mov rsp, rbp
@@ -126,7 +126,7 @@ _cgxWin32GetTimeDelta:
     cvtsi2sd xmm0, rax
 
     ; seconds = delta / freq
-    cvtsi2sd xmm1, qword [rel _cgxWin32State + CGXWin32State.prefFreq]
+    cvtsi2sd xmm1, qword [rel _cgxWin32State + CGXWin32State.perfFreq]
     divsd xmm0, xmm1
 
     mov rsp, rbp
