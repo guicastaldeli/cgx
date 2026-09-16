@@ -12,6 +12,7 @@ extern _cgxWin32DestroyWindow
 extern _cgxWin32InitBlit
 extern _cgxCoreInitFramebuffer
 extern _cgxCoreFreeFramebuffer
+extern _cgxWin32TimerInit
 extern MessageBoxA
 
 global CGXInit
@@ -60,6 +61,9 @@ CGXInit:
 
     ; Prepare Blit
     call _cgxWin32InitBlit
+
+    ; Init timer
+    call _cgxWin32TimerInit
 
     mov eax, 1
     jmp .done

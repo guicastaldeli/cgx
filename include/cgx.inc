@@ -24,3 +24,7 @@ extern CGXGetKey
 extern CGXGetMouseX
 extern CGXGetMouseY
 extern CGXGetMouseButton
+
+; --- Timing ---
+extern CGXGetTime
+extern CGXGetTimeDelta

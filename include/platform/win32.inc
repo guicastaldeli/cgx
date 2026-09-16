@@ -16,4 +16,9 @@ struc CGXWin32State
     .mouseY             resd 1
     .mouseButtons       resb 3
     .padding            resb 1
+    .prefFreq           resq 1
+    .startTime          resq 1
+    .lastTime           resq 1
+    .timerInit          resb 1
+    .pad1               resb 7
 endstruc
