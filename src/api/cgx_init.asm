@@ -13,6 +13,7 @@ extern _cgxWin32InitBlit
 extern _cgxCoreInitFramebuffer
 extern _cgxCoreFreeFramebuffer
 extern _cgxWin32TimerInit
+extern _cgxCoreBufferInit
 extern MessageBoxA
 
 global CGXInit
@@ -64,10 +65,17 @@ CGXInit:
 
     ; Init timer
     call _cgxWin32TimerInit
+    
+    ; Init buffer pool
+    call _cgxCoreBufferInit
+    test eax, eax
+    jz .fail
 
     mov eax, 1
     jmp .done
 
+.fail:
+    xor eax, eax
 .fail_window:
     xor rcx, rcx
     lea rdx, [rel err_win]

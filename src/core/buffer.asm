@@ -9,7 +9,7 @@ default rel
 %include "structs.inc"
 
 extern VirtualAlloc
-extern CGXState
+extern VirtualFree
 
 extern _cgxCoreState
 extern CGXState
@@ -18,7 +18,7 @@ global _cgxCoreBufferInit
 global _cgxCoreBufferCreate
 global _cgxCoreBufferDelete
 global _cgxCoreBufferBind
-global _chxCoreBufferGetData
+global _cgxCoreBufferGetData
 global _cgxCoreBufferGetSize
 
 MEM_COMMIT              equ 0x00001000
@@ -49,14 +49,14 @@ _cgxCoreBufferInit:
     jz .fail
 
     mov [rel _cgxCoreState + CGXState.bufferPool], rax
-    mov dword [rel _cgxCoreState + CGXState.bufferCapacity], INTIAL_CAPACITY
-    mov dword [rel, _cgxCoreState + CGXState.bufferCount], 0
-    mov dword [rel, _cgxCoreState + CGXState.nextBufferId], 1
+    mov dword [rel _cgxCoreState + CGXState.bufferCapacity], INITIAL_CAPACITY
+    mov dword [rel _cgxCoreState + CGXState.bufferCount], 0
+    mov dword [rel _cgxCoreState + CGXState.nextBufferId], 1
 
     mov eax, 1
     jmp .done
 .fail:
-    xor eax,
+    xor eax, eax
 
 .done:
     mov rsp, rbp
@@ -83,7 +83,7 @@ _cgxCoreBufferCreate:
     mov r12, rcx        ; data ptr
     mov r13, rdx        ; size
     mov r14d, r8d       ; usage
-    mov r15, r9d        ; type
+    mov r15d, r9d       ; type
 
     ; Find a free slot
     mov rbx, [rel _cgxCoreState + CGXState.bufferPool]
@@ -121,7 +121,7 @@ _cgxCoreBufferCreate:
     mov r9d, PAGE_READWRITE
     call VirtualAlloc
     test rax, rax
-    jz. alloc_fail
+    jz .alloc_fail
 
     mov r8, rax         ; r8 = new data ptr
 
@@ -367,7 +367,7 @@ _cgxCoreBufferGetSize:
     mov edx, eax
     imul edx, Buffer_size
     mov rdi, rbx
-    add rdi, rbx
+    add rdi, rdx
 
     cmp byte [rdi + Buffer.inUse], 0
     je .next
@@ -379,7 +379,7 @@ _cgxCoreBufferGetSize:
     jmp .scan
 
 .found:
-    rax, [rdi + Buffer.size]
+    mov rax, [rdi + Buffer.size]
     jmp .done
 .notFound:
     xor eax, eax

@@ -18,7 +18,7 @@ extern CGXBindIndexBuffer
 extern CGXDeleteBuffer
 extern MessageBoxA
 
-section .data:
+section .data
     title db "CGX Test - Buffers", 0
 
     ; 2D triangle: 3 vertices each (x, y, z, r, g, b) = 24 bytes
@@ -38,17 +38,31 @@ section .data:
     msg_err_title db "Buffers *err", 0
     msg_err db "Buffer test FAILED", 0
 
+    ; --- Debug messages ---
+    dbg_1 db "1. main entered", 0
+    dbg_2 db "2. CGXInit returned OK", 0
+    dbg_3 db "3. VBO created", 0
+    dbg_4 db "4. EBO created", 0
+    dbg_5 db "5. buffers bound", 0
+    dbg_6 db "6. about to shutdown", 0
+
 section .text
 
 main:
     push rbp
-    mo rbp, rsp
+    mov rbp, rsp
     push rbx
     push r12
     push r13
-    sub rsp, 32
+    sub rsp, 40
 
-    ; Init window + graphics
+    xor rcx, rcx
+    lea rdx, [dbg_1]
+    lea r8, [rel msg_ok_title]
+    mov r9d, 0
+    call MessageBoxA
+
+    ; --- Init window + graphics ---
     mov rcx, 800
     mov rdx, 600
     lea r8, [rel title]
@@ -56,15 +70,27 @@ main:
     cmp eax, 0
     je .error
 
+    xor rcx, rcx
+    lea rdx, [rel dbg_2]
+    lea r8, [rel msg_ok_title]
+    mov r9d, 0
+    call MessageBoxA
+
     ; --- Create Buffers ---
     ; Create VBO
     lea rcx, [rel vertices]
-    mov rdxm vertices_size
+    mov rdx, vertices_size
     mov r8d, CGX_STATIC
     call CGXCreateVertexBuffer
     test eax, eax
     jz .error
-    mov ebx, eax        ; save VBO id
+    mov ebx, eax
+
+    xor rcx, rcx
+    lea rdx, [rel dbg_3]
+    lea r8, [rel msg_ok_title]
+    mov r9d, 0
+    call MessageBoxA
 
     ; Create EBO
     lea rcx, [rel indices]
@@ -73,7 +99,13 @@ main:
     call CGXCreateIndexBuffer
     test eax, eax
     jz .error
-    mov r12d, eax      ; save EBO id
+    mov r12d, eax
+
+    xor rcx, rcx
+    lea rdx, [rel dbg_4]
+    lea r8, [rel msg_ok_title]
+    mov r9d, 0
+    call MessageBoxA
 
     ; --- Bind Buffers ---
     ; Bind VBO
@@ -88,9 +120,8 @@ main:
     cmp eax, 1
     jne .error
 
-    ; --- Success message ---
     xor rcx, rcx
-    lea rdx, [rel msg_ok]
+    lea rdx, [rel dbg_5]
     lea r8, [rel msg_ok_title]
     mov r9d, 0
     call MessageBoxA
@@ -101,6 +132,19 @@ main:
 
     mov ecx, r12d
     call CGXDeleteBuffer
+
+    xor rcx, rcx
+    lea rdx, [rel dbg_6]
+    lea r8, [rel msg_ok_title]
+    mov r9d, 0
+    call MessageBoxA
+
+    ; --- Success message ---
+    xor rcx, rcx
+    lea rdx, [rel msg_ok]
+    lea r8, [rel msg_ok_title]
+    mov r9d, 0
+    call MessageBoxA
 
     call CGXShutdown
     xor eax, eax
@@ -116,10 +160,9 @@ main:
     mov eax, 1
 
 .done:
-    add rsp, 32
+    add rsp, 40
     pop r13
     pop r12
     pop rbx
     pop rbp
     ret
-

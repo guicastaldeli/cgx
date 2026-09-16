@@ -22,7 +22,7 @@ struc CGXState
 endstruc
 
 ; --- Buffer struct ---
-struct Buffer
+struc Buffer
     .id                     resd 1
     .usage                  resd 1
     .type                   resd 1
