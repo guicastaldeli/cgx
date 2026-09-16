@@ -39,9 +39,9 @@ _cgxCoreBufferInit:
     mov rbp, rsp
     sub rsp, 32
 
-    ; Allocate initial pool: INTIIAL_CAPACITY * CGXBuffer_size bytes
+    ; Allocate initial pool: INTIIAL_CAPACITY * Buffer_size bytes
     xor rcx, rcx
-    mov rdx, INITIAL_CAPACITY * CGXBuffer_size
+    mov rdx, INITIAL_CAPACITY * Buffer_size
     mov r8d, MEM_COMMIT | MEM_RESERVE
     mov r9d, PAGE_READWRITE
     call VirtualAlloc
@@ -94,13 +94,13 @@ _cgxCoreBufferCreate:
     cmp eax, ecx
     jge .growPool
 
-    ; slot = pool + index * CGXBuffer_size
+    ; slot = pool + index * Buffer_size
     mov edx, eax
-    imul edx, CGXBuffer_size
+    imul edx, Buffer_size
     mov rdi, rbx
     add rdi, rdx
 
-    cmp byte [rdi + CGXBuffer.inUse], 0
+    cmp byte [rdi + Buffer.inUse], 0
     je .slotFound
     inc eax
     jmp .findSlot
@@ -139,12 +139,12 @@ _cgxCoreBufferCreate:
 
     ; Fill slot
     mov edx, [rel _cgxCoreState + CGXState.nextBufferId]
-    mov [rdi + CGXBuffer.id], edx
-    mov [rdi + CGXBuffer.data], r8
-    mov [rdi + CGXBuffer.size], r13
-    mov [rdi + CGXBuffer.usage], r14d
-    mov [rdi + CGXBuffer.type], r15d
-    mov byte [rdi + CGXBuffer.inUse], 1
+    mov [rdi + Buffer.id], edx
+    mov [rdi + Buffer.data], r8
+    mov [rdi + Buffer.size], r13
+    mov [rdi + Buffer.usage], r14d
+    mov [rdi + Buffer.type], r15d
+    mov byte [rdi + Buffer.inUse], 1
 
     ; Increment counter and count
     inc dword [rel _cgxCoreState + CGXState.nextBufferId]
@@ -193,21 +193,21 @@ _cgxCoreBufferDelete:
     jge .notFound
 
     mov edx, eax
-    imul edx, CGXBuffer_size
+    imul edx, Buffer_size
     mov rdi, rbx
     add rdi, rdx
 
-    cmp byte [rdi + CGXBuffer.inUse], 0
+    cmp byte [rdi + Buffer.inUse], 0
     je .next
 
-    cmp dword [rdi + CGXBuffer.id], r12d
+    cmp dword [rdi + Buffer.id], r12d
     je .found
 .next:
     inc eax
     jmp .scan
 .found:
     ; Free the data
-    mov rcx, [rdi + CGXBuffer.data]
+    mov rcx, [rdi + Buffer.data]
     test rcx, rcx
     jz .markFree
 
@@ -215,8 +215,8 @@ _cgxCoreBufferDelete:
     mov r8d, MEM_RELEASE
     call VirtualFree
 .markFree:
-    mov byte [rdi + CGXBuffer.inUse], 0
-    mov qword [rdi + CGXBuffer.data], 0
+    mov byte [rdi + Buffer.inUse], 0
+    mov qword [rdi + Buffer.data], 0
     dec dword [rel _cgxCoreState + CGXState.bufferCount]
 
     mov eax, 1
@@ -257,14 +257,14 @@ _cgxCoreBufferBind:
     jge .notFound
 
     mov edx, eax
-    imul edx, CGXBuffer_size
+    imul edx, Buffer_size
     mov rdi, rbx
     add rdi, rdx
 
-    cmp byte [rdi + CGXBuffer.inUse], 0
+    cmp byte [rdi + Buffer.inUse], 0
     je .next
 
-    cmp dword [rdi + CGXBuffer.id], r12d
+    cmp dword [rdi + Buffer.id], r12d
     je .found
 .next:
     inc eax
@@ -317,21 +317,21 @@ _cgxCoreBufferGetData:
     jge .notFound
 
     mov edx, eax
-    imul edx, CGXBuffer_size
+    imul edx, Buffer_size
     mov rdi, rbx
     add rdi, rdx
 
-    cmp byte [rdi + CGXBuffer.inUse], 0
+    cmp byte [rdi + Buffer.inUse], 0
     je .next
 
-    cmp dword [rdi + CGXBuffer.id], r12d
+    cmp dword [rdi + Buffer.id], r12d
     je .found
 .next:
     inc eax
     jmp .scan
 
 .found:
-    mov rax, [rdi + CGXBuffer.data]
+    mov rax, [rdi + Buffer.data]
     jmp .done
 .notFound:
     xor eax, eax
@@ -365,21 +365,21 @@ _cgxCoreBufferGetSize:
     jge .notFound
 
     mov edx, eax
-    imul edx, CGXBuffer_size
+    imul edx, Buffer_size
     mov rdi, rbx
     add rdi, rbx
 
-    cmp byte [rdi + CGXBuffer.inUse], 0
+    cmp byte [rdi + Buffer.inUse], 0
     je .next
 
-    cmp dword [rdi + CGXBuffer.id], r12d
+    cmp dword [rdi + Buffer.id], r12d
     je .found
 .next:
     inc eax
     jmp .scan
 
 .found:
-    rax, [rdi + CGXBuffer.size]
+    rax, [rdi + Buffer.size]
     jmp .done
 .notFound:
     xor eax, eax

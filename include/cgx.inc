@@ -33,3 +33,10 @@ extern CGXGetTimeDelta
 extern CGXSetColor
 extern CGXDrawPixel
 extern CGXDrawLine
+
+; --- Buffers ---
+extern CGXCreateVertexBuffer
+extern CGXCreateIndexBuffer
+extern CGXBindVertexBuffer
+extern CGXBindIndexBuffer
+extern CGXDeleteBuffer
