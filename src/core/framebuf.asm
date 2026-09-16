@@ -15,6 +15,7 @@ extern MessageBoxA
 extern _cgxCoreState
 extern _cgxCoreGetWidth
 extern _cgxCoreGetHeight
+extern _cgxCoreRgbToBgra
 
 global _cgxCoreInitFramebuffer
 global _cgxCoreFreeFramebuffer
@@ -155,6 +156,7 @@ _cgxCoreFreeFramebuffer:
 _cgxCoreClear:
     push rbp
     mov rbp, rsp
+    push rbx
 
     test ecx, CGX_COLOR_BIT
     jz .done
@@ -174,34 +176,68 @@ _cgxCoreClear:
     mulss xmm3, xmm4
 
     ; Convert to int
-    cvttss2si eax, xmm0     ; R
-    cvttss2si ebx, xmm1     ; G
-    cvttss2si ecx, xmm2     ; B
-    cvttss2si edx, xmm3     ; A
+    cvttss2si r8d, xmm0      ; R
+    cvttss2si r9d, xmm1      ; G
+    cvttss2si r10d, xmm2     ; B
+    cvttss2si r11d, xmm3     ; A
 
-    ; Pack BGRA (little-endian: B | G << 8 | R << 16 | A << 24)
-    and eax, 0xFF
-    shl eax, 16             ; R << 16
+    ; Clamp each to 0..255
+    ; R
+    cmp r8d, 0
+    jge .OKr
+    xor r8d, r8d
 
-    and ebx, 0xFF
-    shl ebx, 8              ; G << 8
+        .OKr:
+            cmp r8d, 255
+            jle .DONEr
+            mov r8d, 255
+        .DONEr:
+            ; G
+            cmp r9d, 0
+            jge .OKg
+            xor r9d, r9d
+        .OKg:
+            cmp r9d, 255
+            jle .DONEg
+            mov r9d, 255
+        .DONEg:
+            ; B
+            cmp r10d, 0
+            jge .OKb
+            xor r10d, r10d
+        .OKb:
+            cmp r10d, 255
+            jle .DONEb
+            mov r10d, 255
+        .DONEb:
+            ; A
+            cmp r11d, 0
+            jge .OKa
+            xor r11d, r11d
+        .OKa:
+            cmp r11d, 255
+            jle .DONEa
+            mov r11d, 255
+        .DONEa:
+            ; Pack RGB into 0x00RRGGBB (R high, B low)
+            mov eax, r8d
+            shl eax, 16
+            mov ecx, r9d
+            shl ecx, 8
+            or eax, ecx
+            or eax, r10d        ; B
 
-    and ecx, 0xFF           ; B
+            ; Convert to BGRA
+            mov ecx, eax
+            call _cgxCoreRgbToBgra
 
-    and edx, 0xFF
-    shl edx, 24             ; A << 24
-
-    or eax, ebx
-    or eax, ecx
-    or eax, edx
-
-    ; Fill
-    mov rdi, [rel _cgxCoreState + CGXState.framebuffer]
-    mov ecx, [rel _cgxCoreState + CGXState.width]
-    imul ecx, [rel _cgxCoreState + CGXState.height]
-    rep stosd
+            ; Fill framebuffer
+            mov rdi, [rel _cgxCoreState + CGXState.framebuffer]
+            mov ecx, [rel _cgxCoreState + CGXState.width]
+            imul ecx, [rel _cgxCoreState + CGXState.height]
+            rep stosd
 
 .done:
-    mov rsp, rbp
+    pop rbx
     pop rbp
     ret

@@ -35,5 +35,5 @@ CGXDrawPixel:
 ; Input: rcx = x1, rdx = y1, r8 = x2, r9 = y2
 ; Uses current draw color...
 ; --------------------------------------------
-.CGXDrawLine:
+CGXDrawLine:
     jmp _cgxCoreDrawLine

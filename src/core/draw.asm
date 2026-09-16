@@ -13,7 +13,7 @@ extern _cgxCoreGetFramebuffer
 extern _cgxCoreGetWidth
 extern _cgxCoreGetHeight
 
-global _cgxCoreRgbToRgra
+global _cgxCoreRgbToBgra
 global _cgxCoreSetColor
 global _cgxCoreDrawPixel
 global _cgxCoreDrawLine
@@ -60,6 +60,10 @@ _cgxCoreSetColor:
 ; Uses current draw color... skips if out of bounds...
 ; --------------------------------------------
 _cgxCoreDrawPixel:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 32
+    
     ; Bounds check
     cmp ecx, 0
     jl .out
@@ -90,9 +94,10 @@ _cgxCoreDrawPixel:
     call _cgxCoreRgbToBgra
 
     mov [r8], eax
-    ret
 
 .out:
+    mov rsp, rbp
+    pop rbp
     ret
 
 ; --------------------------------------------
@@ -108,49 +113,49 @@ _cgxCoreDrawLine:
     push r13
     push r14
     push r15
-    push rsp, 32
+    sub rsp, 64
 
     ; -- Save endpoints ---
-    mov r12d, ecx           ; x1
-    mov r13d, edx           ; y1
-    mov r14d, r8d           ; x2
-    mov r15d, r9d           ; y2
+    mov r12d, ecx                   ; x1
+    mov r13d, edx                   ; y1
+    mov r14d, r8d                   ; x2
+    mov r15d, r9d                   ; y2
 
-    ; --- Compute deltas ---
+    ; dx = x2 - x1
     mov eax, r14d
-    sub eax, r12d           ; dx = x2 - x1
-    mov r8d, eax
+    sub eax, r12d
+    mov [rbp - 48], eax
 
-    mov eax, r15d
-    sub eax, r13d           ; dy = y2 - y1
-    mov r9d, eax
-
-    ; --- Step direction for X ---
-    mov ebx, 1
-    cmp r8d, 0
+    ; sx
+    mov dword [rbp - 56], 1         ; sx = 1
+    cmp eax, 0
     jge .dx_pos
-    neg r8d                 ; dx = |dx|
-    mov ebx, -1
-
+    neg dword [rbp - 48]            ; dx = |dx|
+    mov dword [rbp - 56], -1        ; sx = -1
 .dx_pos:
-    ; --- Step direction for Y ---
-    mov r10d, 1
-    cmp r9d, 0
-    jge .dy_pos             ; dy = |dy|
-    neg r9d
-    mov r10d, -1
+    ; dy = y2 - y1
+    mov eax, r15d
+    sub eax, r13d
+    mov [rbp - 52], eax             ; dy (local)
+
+    ; sy
+    mov dword [rbp - 60], 1         ; sy = 1
+    cmp eax, 0
+    jge .dy_pos
+    neg dword [rbp - 52]
+    mov dword [rbp - 60], -1 
 .dy_pos:
-    ; --- err = dx - dy ---
-    mov eax, r8d
-    sub eax, r9d
-    mov r11d, eax           ; err
+    mov eax, [rbp - 48]
+    sub eax, [rbp - 52]
+    mov [rbp - 64], eax             ; err
 
 .loop:
-    ; Draw current pixel
+    ; Draw pixel
     mov ecx, r12d
     mov edx, r13d
     call _cgxCoreDrawPixel
 
+    ; Termination: x1 == x2 && y1 == y2
     cmp r12d, r14d
     jne .not_done
     cmp r13d, r15d
@@ -158,39 +163,32 @@ _cgxCoreDrawLine:
     jmp .done
 
 .not_done:
-    ; e2 = 2 * err
-    mov eax, r11d
-    add eax, eax            ; e2
+    mov eax, [rbp - 64]
+    add eax, eax                ; e2 = 2*err
 
-    /*
-        if(e2 >= -dy) {
-            err -= dy;
-            x1 += sx;
-        }
-        */
-    mov edi, r9d
-    neg edi                 ; -dy
+    ; if(e2 >= -dy)
+    mov edi, [rbp - 52]
+    neg edi
     cmp eax, edi
     jl .skip_x
-    sub r11d, r9d
-    add r12d, ebx
+    mov ecx, [rbp - 52]
+    sub [rbp - 64], ecx         ; err -= dy
+    mov ecx, [rbp - 56]
+    add r12d, ecx               ; x1 += sx
 
 .skip_x:
-    /*
-        if(e2 <= dx) {
-            err += dx;
-            y1 += sy;
-        }
-        */
-    cmp eax, r8d
+    ; if(e2 <= dx)
+    cmp eax, [rbp - 48]
     jg .skip_y
-    add r11d, r8d
-    add r13d, r10d
+    mov ecx, [rbp - 48]
+    add [rbp - 64], ecx         ; err += dx
+    mov ecx, [rbp - 60]
+    add r13d, ecx               ; y1 += sy
 .skip_y:
     jmp .loop
 
 .done:
-    add rsp, 32
+    add rsp, 64
     pop r15
     pop r14
     pop r13

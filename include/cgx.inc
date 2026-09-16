@@ -28,3 +28,8 @@ extern CGXGetMouseButton
 ; --- Timing ---
 extern CGXGetTime
 extern CGXGetTimeDelta
+
+; --- Drawing ---
+extern CGXSetColor
+extern CGXDrawPixel
+extern CGXDrawLine

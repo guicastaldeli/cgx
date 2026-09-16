@@ -55,7 +55,7 @@ main:
     call CGXPollEvents
     call CGXShouldClose
     cmp eax, 1
-    .je .done
+    je .done
 
     ; ESC to close
     mov rcx, CGX_KEY_ESC
@@ -69,21 +69,20 @@ main:
     mov ecx, 0x00004000
     call CGXClear
 
-    ; --- Draw triangle edges
-    /*
-        Vertices in pixels (with margin):
-            A = (400, 100)
-            B = (150, 500)
-            C = (650, 500)
+    ; --- Draw triangle edges ---
+    ;   Vertices in pixels (with margin):
+    ;       A = (400, 100)
+    ;       B = (150, 500)
+    ;       C = (650, 500)
 
-        Colors:
-            A -> red (0x00FF0000)
-            B -> green (0x0000FF00)
-            C -> blue (0x000000FF)
-        */
+    ;   Colors:
+    ;       A -> red (0x00FF0000)
+    ;       B -> green (0x0000FF00)
+    ;       C -> blue (0x000000FF)
 
     ; Edge A->B: red
     mov ecx, 0x00FF0000
+    call CGXSetColor
     mov rcx, 400
     mov rdx, 100
     mov r8, 150
@@ -101,6 +100,7 @@ main:
 
     ; Edge C->A: blue
     mov ecx, 0x000000FF
+    call CGXSetColor
     mov rcx, 650
     mov rdx, 500
     mov r8, 400

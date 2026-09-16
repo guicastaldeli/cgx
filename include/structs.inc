@@ -12,4 +12,5 @@ struc CGXState
     .clearG         resd 1 ; clear color G (float)
     .clearB         resd 1 ; clear color B (float)
     .clearA         resd 1 ; clear color A (float)
+    .drawColor      resd 1 ; current draw color (0x00RRGGBB)
 endstruc
