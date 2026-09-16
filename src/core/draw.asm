@@ -1,5 +1,5 @@
 ; ============================================
-; core/cgx_draw.asm
+; core/draw.asm
 ; Portable drawing primitives
 ; ============================================
 
