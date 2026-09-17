@@ -41,9 +41,9 @@ _cgxCoreVAOInit:
     sub rsp, 32
 
     xor rcx, rcx
-    mov rdx, INTIAL_VAO_CAPACITY * VAO_size
+    mov rdx, INITIAL_VAO_CAPACITY * VAO_size
     mov r8d, MEM_COMMIT | MEM_RESERVE
-    mov r9d PAGE_READWRITE
+    mov r9d, PAGE_READWRITE
     call VirtualAlloc
     test rax, rax
     jz .fail
@@ -90,7 +90,7 @@ _cgxCoreVAOCreate:
     mov rdi, rbx
     add rdi, rdx
 
-    cm byte [rdi + VAO.inUse], 0
+    cmp byte [rdi + VAO.inUse], 0
     je .slotFound
     inc eax
     jmp .findSlot
@@ -322,10 +322,10 @@ _cgxCoreVAOAttribPointer:
     ; stride and offset are 5th and 6th args on stack
     ; [rbp+16] = stride
     ; [rbp+24] = offset
-    mov eax, [rbp + 16]
-    mov [rdi + Attrib.strib], eax
+    mov eax, [rbp + 48]
+    mov [rdi + Attrib.stride], eax
 
-    mov eax, [rbp + 24]
+    mov eax, [rbp + 56]
     mov [rdi + Attrib.offset], eax
 
     mov eax, 1
@@ -387,7 +387,7 @@ _cgxCoreVAODisableAttrib:
     push rbx
     sub rsp, 32
 
-    mov ebx
+    mov ebx, ecx
     cmp ebx, 16
     jae .fail
 
@@ -427,7 +427,7 @@ _cgxCoreVAOGetAttrib:
     jae .fail
 
     call _cgxCoreVAOFindBound
-    test rdi, rsi
+    test rdi, rdi
     jz .fail
 
     mov eax, ebx

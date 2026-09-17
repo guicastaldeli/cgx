@@ -17,7 +17,7 @@ extern _cgxCoreVAODisableAttrib
 global CGXCreateVertexArray
 global CGXDeleteVertexArray
 global CGXBindVertexArray
-global CGXVertexAttribPoinyer
+global CGXVertexAttribPointer
 global CGXEnableVertexAttribArray
 global CGXDisableVertexAttribArray
 
@@ -64,5 +64,5 @@ CGXEnableVertexAttribArray:
 ; CGXDisableVertexAttribArray
 ; Input: rcx = index
 ; --------------------------------------------
-CGXDIsableVertexAttribArray:
+CGXDisableVertexAttribArray:
     jmp _cgxCoreVAODisableAttrib

@@ -12,6 +12,7 @@ extern _cgxWin32DestroyWindow
 extern _cgxWin32InitBlit
 extern _cgxCoreInitFramebuffer
 extern _cgxCoreFreeFramebuffer
+extern _cgxCoreVAOInit
 extern _cgxWin32TimerInit
 extern _cgxCoreBufferInit
 extern MessageBoxA
@@ -68,6 +69,11 @@ CGXInit:
     
     ; Init buffer pool
     call _cgxCoreBufferInit
+    test eax, eax
+    jz .fail
+
+    ; Init VAO pool
+    call _cgxCoreVAOInit
     test eax, eax
     jz .fail
 

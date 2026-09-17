@@ -26,7 +26,6 @@ extern MessageBoxA
 section .data
     title db "CGX Test - VAO", 0
 
-    ; 3 vertices, each: xyz (3 floats) + rgb (3 floats) = 24 bytes
     vertices:
         dd 0.0, 0.5, 0.0,   1.0, 0.0, 0.0
         dd -0.5, -0.5, 0.0, 0.0, 1.0, 0.0
@@ -42,6 +41,16 @@ section .data
     msg_err_title db "VAO Test - ERR", 0
     msg_err db "VAO test FAILED", 0
 
+    dbg_1 db "1. main entered", 0
+    dbg_2 db "2. CGXInit returned", 0
+    dbg_3 db "3. VBO created", 0
+    dbg_4 db "4. EBO created", 0
+    dbg_5 db "5. VAO created", 0
+    dbg_6 db "6. VAO bound", 0
+    dbg_7 db "7. VBO/EBO bound to VAO", 0
+    dbg_8 db "8. attrib pointer set", 0
+    dbg_9 db "9. attrib enabled", 0
+
 section .text
 
 main:
@@ -53,6 +62,13 @@ main:
     push r14
     sub rsp, 40
 
+    ; DEBUG 1
+    xor rcx, rcx
+    lea rdx, [rel dbg_1]
+    lea r8, [rel msg_ok_title]
+    mov r9d, 0
+    call MessageBoxA
+
     ; Init
     mov rcx, 800
     mov rdx, 600
@@ -61,6 +77,13 @@ main:
     cmp eax, 0
     je .error
 
+    ; DEBUG 2
+    xor rcx, rcx
+    lea rdx, [rel dbg_2]
+    lea r8, [rel msg_ok_title]
+    mov r9d, 0
+    call MessageBoxA
+
     ; Create VBO
     lea rcx, [rel vertices]
     mov rdx, vertices_size
@@ -68,9 +91,15 @@ main:
     call CGXCreateVertexBuffer
     test eax, eax
     jz .error
-    mov ebx, eax                        ; vbo id
+    mov ebx, eax
 
-    ; -- Create Buffers ---
+    ; DEBUG 3
+    xor rcx, rcx
+    lea rdx, [rel dbg_3]
+    lea r8, [rel msg_ok_title]
+    mov r9d, 0
+    call MessageBoxA
+
     ; Create EBO
     lea rcx, [rel indices]
     mov rdx, indices_size
@@ -78,20 +107,40 @@ main:
     call CGXCreateIndexBuffer
     test eax, eax
     jz .error
-    mov r12d, eax                       ; ebo id
+    mov r12d, eax
+
+    ; DEBUG 4
+    xor rcx, rcx
+    lea rdx, [rel dbg_4]
+    lea r8, [rel msg_ok_title]
+    mov r9d, 0
+    call MessageBoxA
 
     ; Create VAO
     call CGXCreateVertexArray
     test eax, eax
     jz .error
-    mov r13d, eax                       ; vao id
+    mov r13d, eax
 
-    ; --- Bind Buffers ---
+    ; DEBUG 5
+    xor rcx, rcx
+    lea rdx, [rel dbg_5]
+    lea r8, [rel msg_ok_title]
+    mov r9d, 0
+    call MessageBoxA
+
     ; Bind VAO
     mov ecx, r13d
     call CGXBindVertexArray
     cmp eax, 1
     jne .error
+
+    ; DEBUG 6
+    xor rcx, rcx
+    lea rdx, [rel dbg_6]
+    lea r8, [rel msg_ok_title]
+    mov r9d, 0
+    call MessageBoxA
 
     ; Bind VBO
     mov ecx, ebx
@@ -105,16 +154,30 @@ main:
     cmp eax, 1
     jne .error
 
-    ; Attribute 0: position (3 floats, offset 0, stride 24)
+    ; DEBUG 7
+    xor rcx, rcx
+    lea rdx, [rel dbg_7]
+    lea r8, [rel msg_ok_title]
+    mov r9d, 0
+    call MessageBoxA
+
+    ; Attribute 0: position
     mov rcx, 0
     mov rdx, 3
     mov r8d, CGX_FLOAT
     xor r9d, r9d
-    mov qword [rsp + 32], 24            ; stride
-    mov qword [rsp + 40], 0             ; offset
+    mov qword [rsp + 32], 24
+    mov qword [rsp + 40], 0
     call CGXVertexAttribPointer
 
-    ; Attribute 1: color (3 floats, offset 12, stride 24)
+    ; DEBUG 8
+    xor rcx, rcx
+    lea rdx, [rel dbg_8]
+    lea r8, [rel msg_ok_title]
+    mov r9d, 0
+    call MessageBoxA
+
+    ; Attribute 1: color
     mov rcx, 1
     mov rdx, 3
     mov r8d, CGX_FLOAT
@@ -133,6 +196,13 @@ main:
     call CGXEnableVertexAttribArray
     cmp eax, 1
     jne .error
+
+    ; DEBUG 9
+    xor rcx, rcx
+    lea rdx, [rel dbg_9]
+    lea r8, [rel msg_ok_title]
+    mov r9d, 0
+    call MessageBoxA
 
     ; Success
     xor rcx, rcx

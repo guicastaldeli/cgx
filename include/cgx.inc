@@ -40,3 +40,11 @@ extern CGXCreateIndexBuffer
 extern CGXBindVertexBuffer
 extern CGXBindIndexBuffer
 extern CGXDeleteBuffer
+
+; --- VAOs ---
+extern CGXCreateVertexArray
+extern CGXDeleteVertexArray
+extern CGXBindVertexArray
+extern CGXVertexAttribPointer
+extern CGXEnableVertexAttribArray
+extern CGXDisableVertexAttribArray

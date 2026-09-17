@@ -19,6 +19,11 @@ struc CGXState
     .nextBufferId           resd 1
     .boundVBO               resd 1
     .boundEBO               resd 1
+    .vaoPool                resq 1
+    .vaoCount               resd 1
+    .vaoCapacity            resd 1
+    .nextVaoId              resd 1
+    .boundVAO               resd 1
 endstruc
 
 ; --- Buffer struct ---
@@ -32,3 +37,22 @@ struc Buffer
     .size                   resq 1
 endstruc
 
+; --- Attribute struct ---
+struc Attrib
+    .enabled                resb 1
+    .size                   resb 1
+    .type                   resb 1
+    .normalized             resb 1
+    .stride                 resd 1
+    .offset                 resd 1
+endstruc
+
+; --- VAO struct ---
+struc VAO
+    .id                     resd 1
+    .vbo                    resd 1
+    .ebo                    resd 1
+    .inUse                  resb 1
+    .pad0                   resb 3
+    .attribs                resb Attrib_size * 16
+endstruc
