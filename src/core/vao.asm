@@ -238,4 +238,210 @@ _cgxCoreVAOBind:
 ; Helper: returns rdi = pointer to bound VAO, or 0
 ; --------------------------------------------
 _cgxCoreVAOFindBound:
+    push rbx
+    push r12
+
+    mov r12d, [rel _cgxCoreState + CGXState.boundVAO]
+    test r12d, r12d
+    jz .none
+
+    mov rbx, [rel _cgxCoreState + CGXState.vaoPool]
+    mov ecx, [rel _cgxCoreState + CGXState.vaoCapacity]
+    xor eax, eax
+
+.scan:
+    cmp eax, ecx
+    jge .none
+
+    mov edx, eax
+    imul edx, VAO_size
+    mov rdi, rbx
+    add rdi, rdx
+
+    cmp byte [rdi + VAO.inUse], 0
+    je .next
+
+    cmp dword [rdi + VAO.id], r12d
+    je .found
+.next:
+    inc eax
+    jmp .scan
+
+.found:
+    pop r12
+    pop rbx
+    ret
+
+.none:
+    xor edi, edi
+    pop r12
+    pop rbx
+    ret
     
+; --------------------------------------------
+; _cgxCoreVAOAttribPointer
+; Input: ecx = index, edx = size, r8d = type,
+;    r9d = normalized, [rsp+32] = stride,
+;    [rsp+40] = offset
+;   (5th and 6th args on the stack)
+; Output: eax = 1 ok, 0 fail
+; --------------------------------------------
+_cgxCoreVAOAttribPointer:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    push r12
+    sub rsp, 32
+
+    ; Save args
+    mov r12d, ecx                           ; index
+    mov ebx, edx                            ; size
+    mov r10d, r8d                           ; type
+    mov r11d, r9d                           ; normalized
+
+    ; Validate index
+    cmp r12d, 16
+    jae .fail
+
+    ; Get bound VAO
+    call _cgxCoreVAOFindBound
+    test rdi, rdi
+    jz .fail
+
+    ; attrib = vao->attribs + index * CGXAttib_size
+    mov eax, r12d
+    imul eax, Attrib_size
+    lea rdi, [rdi + VAO.attribs + rax]
+
+    ; Store attribn fields
+    mov byte [rdi + Attrib.enabled], 1      ; enabled by default when set
+    mov [rdi + Attrib.size], bl
+    mov [rdi + Attrib.type], r10b
+    mov [rdi + Attrib.normalized], r11b
+
+    ; stride and offset are 5th and 6th args on stack
+    ; [rbp+16] = stride
+    ; [rbp+24] = offset
+    mov eax, [rbp + 16]
+    mov [rdi + Attrib.strib], eax
+
+    mov eax, [rbp + 24]
+    mov [rdi + Attrib.offset], eax
+
+    mov eax, 1
+    jmp .done
+
+.fail:
+    xor eax, eax
+
+.done:
+    add rsp, 32
+    pop r12
+    pop rbx
+    pop rbp
+    ret
+
+; --------------------------------------------
+; _cgxCoreVAOEnableAttrib
+; Input: ecx = index
+; Output: eax = 1 ok, 0 fail
+; --------------------------------------------
+_cgxCoreVAOEnableAttrib:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    sub rsp, 32
+
+    mov ebx, ecx
+    cmp ebx, 16
+    jae .fail
+
+    call _cgxCoreVAOFindBound
+    test rdi, rdi
+    jz .fail
+
+    mov eax, ebx
+    imul eax, Attrib_size
+    mov byte [rdi + VAO.attribs + rax + Attrib.enabled], 1
+
+    mov eax, 1
+    jmp .done
+
+.fail:
+    xor eax, eax
+
+.done:
+    add rsp, 32
+    pop rbx
+    pop rbp
+    ret
+
+; --------------------------------------------
+; _cgxCoreVAODisableAttrib
+; Input: ecx = index
+; Output: eax = 1 ok, 0 fail
+; --------------------------------------------
+_cgxCoreVAODisableAttrib:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    sub rsp, 32
+
+    mov ebx
+    cmp ebx, 16
+    jae .fail
+
+    call _cgxCoreVAOFindBound
+    test rdi, rdi
+    jz .fail
+
+    mov eax, ebx
+    imul eax, Attrib_size
+    mov byte [rdi + VAO.attribs + rax + Attrib.enabled], 0
+
+    mov eax, 1
+    jmp .done
+
+.fail:
+    xor eax, eax
+
+.done:
+    add rsp, 32
+    pop rbx
+    pop rbp
+    ret
+
+; --------------------------------------------
+; _cgxCoreVAOGetAttrib
+; Input: ecx = index
+; Output: rdi = pointer to attrib, or 0
+; --------------------------------------------
+_cgxCoreVAOGetAttrib:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    sub rsp, 32
+
+    mov ebx, ecx
+    cmp ebx, 16
+    jae .fail
+
+    call _cgxCoreVAOFindBound
+    test rdi, rsi
+    jz .fail
+
+    mov eax, ebx
+    imul eax, Attrib_size
+    lea rdi, [rdi + VAO.attribs + rax]
+
+    mov eax, 1
+    jmp .done
+
+.fail:
+    xor edi, edi
+
+.done:
+    add rsp, 32
+    pop rbx
+    pop rbp
+    ret
