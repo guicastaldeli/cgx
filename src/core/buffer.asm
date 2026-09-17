@@ -143,7 +143,7 @@ _cgxCoreBufferCreate:
 
     ; Fill slot (rbx = slot ptr, r8 = data ptr, rdx = id)
     mov [rbx + Buffer.id], edx
-    mov [rdx + Buffer.data], r8
+    mov [rbx + Buffer.data], r8
     mov [rbx + Buffer.size], r13
     mov [rbx + Buffer.usage], r14d
     mov [rbx + Buffer.type], r15d

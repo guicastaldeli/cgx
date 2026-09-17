@@ -322,10 +322,10 @@ _cgxCoreVAOAttribPointer:
     ; stride and offset are 5th and 6th args on stack
     ; [rbp+16] = stride
     ; [rbp+24] = offset
-    mov eax, [rbp + 48]
+    mov eax, [rbp + 40]
     mov [rdi + Attrib.stride], eax
 
-    mov eax, [rbp + 56]
+    mov eax, [rbp + 48]
     mov [rdi + Attrib.offset], eax
 
     mov eax, 1
