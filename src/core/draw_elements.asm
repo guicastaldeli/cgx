@@ -289,7 +289,7 @@ _cgxCoreRasterTriangle:
     mov [rbp - 80], r10d
     mov [rbp - 84], r11d
 
-    ; denom = (dy - cy)*(ax - cx) + (cx - bx)*(ay - cy)
+    ; denom = (by - cy)*(ax - cx) + (cx - bx)*(ay - cy)
     mov eax, r9d
     sub eax, r11d
     cvtsi2ss xmm0, eax

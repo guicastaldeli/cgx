@@ -30,7 +30,7 @@ extern CGXEnable
 extern CGXDepthFunc
 extern MessageBoxA
 
-section .data:
+section .data
     title db "CGX Test - Depth", 0
 
     cR dd 0.05
@@ -166,7 +166,7 @@ main:
 
 .render:
     ; Clear color + depth
-    mov eax, CGX_COLOR_BIT | CGX_DEPTH_BIT
+    mov ecx, CGX_COLOR_BIT | CGX_DEPTH_BIT
     call CGXClear
 
     ; Bind and draw
@@ -177,7 +177,7 @@ main:
     mov rdx, 6
     mov r8d, CGX_UINT
     xor r9d, r9d
-    call CGXDrawElement
+    call CGXDrawElements
 
     call CGXSwapBuffers
     jmp .loop

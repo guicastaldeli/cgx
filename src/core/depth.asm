@@ -36,7 +36,7 @@ section .text
 _cgxCoreDepthInit:
     push rbp
     mov rbp, rsp
-    sub rsp 32
+    sub rsp ,32
 
     ; size = width * height * 4
     mov eax, ecx
@@ -241,9 +241,9 @@ _cgxCoreDepthTest:
 ;
 ; Not Equal
 ;
-testNotEqual:
+.testNotEqual:
     comiss xmm0, xmm1
-    jne .pass_wite
+    jne .pass_write
     jmp .fail
 
 ;;;;;;;;;
@@ -252,7 +252,7 @@ testNotEqual:
     movss [rbx], xmm0       ; update depth buffer
     mov eax, 1
     jmp .done
-pass_no_write:
+.pass_no_write:
     mov eax, 1
     jmp .done
 
