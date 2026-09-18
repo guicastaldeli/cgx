@@ -276,23 +276,23 @@ _cgxWin32WndProc:
     je .onDestroy
 
     ; Input
-    cmp edx, WM_KEYDOWN
+    cmp edx, WM_KEYDOWN                 ; WM_KEYDOWN
     je .onKeyDown
-    cmp edx, WM_KEYUP
+    cmp edx, WM_KEYUP                   ; WM_KEYUP
     je .onKeyUp
-    cmp edx, WM_MOUSEMOVE
+    cmp edx, WM_MOUSEMOVE               ; WM_MOUSEMOVE
     je .onMouseMove
-    cmp edx, WM_LBUTTONDOWN
+    cmp edx, WM_LBUTTONDOWN             ; WM_LBUTTONDOWN
     je .onLButtonDown
-    cmp edx, WM_LBUTTONUP
+    cmp edx, WM_LBUTTONUP               ; WM_LBUTTONUP
     je .onLButtonUp
-    cmp edx, WM_RBUTTONDOWN
+    cmp edx, WM_RBUTTONDOWN             ; WM_RBUTTONDOWN
     je .onRButtonDown
-    cmp edx, WM_RBUTTONUP
+    cmp edx, WM_RBUTTONUP               ; WM_RBUTTONUP
     je .onRButtonUp
-    cmp edx, WM_MBUTTONDOWN
+    cmp edx, WM_MBUTTONDOWN             ; WM_MBUTTONDOWN
     je .onMButtonDown
-    cmp edx, WM_MBUTTONUP
+    cmp edx, WM_MBUTTONUP               ; WM_MBUTTONUP
     je .onMButtonUp
 
     ; Default handling
@@ -309,6 +309,11 @@ _cgxWin32WndProc:
     call PostQuitMessage
     xor eax, eax
 
+;;;;;;;;;
+
+;
+; Key
+;
 .onKeyDown:
     ; wParam (r8): virtual key code
     movzx eax, r8b
@@ -324,6 +329,9 @@ _cgxWin32WndProc:
     xor eax, eax
     jmp .finish
 
+;
+; Mouse Move
+;
 .onMouseMove:
     ; lParam (r9): low word = X, high word = Y
     mov eax, r9d
@@ -338,6 +346,9 @@ _cgxWin32WndProc:
     xor eax, eax
     jmp .finish
 
+;
+; Mouse Button
+;
 .onLButtonDown:
     mov byte [rel _cgxWin32State + CGXWin32State.mouseButtons + 0], 1
     xor eax, eax
@@ -366,6 +377,8 @@ _cgxWin32WndProc:
 .onMButtonUp:
     mov byte [rel _cgxWin32State + CGXWin32State.mouseButtons + 1], 0
     xor eax, eax
+
+;;;;;;;;;
 
 .finish:
     mov rsp, rbp

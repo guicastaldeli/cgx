@@ -566,14 +566,19 @@ _cgxCoreDrawElements:
 
     ; Dispatch
     mov eax, [rbp - 48]
-    cmp eax, CGX_TRIANGLES
+    cmp eax, CGX_TRIANGLES      ; CGX_TRIANGLES
     je .triangles
-    cmp eax, CGX_LINES
+    cmp eax, CGX_LINES          ; CGX_LINES
     je .lines
-    cmp eax, CGX_POINTS
+    cmp eax, CGX_POINTS         ; CGX_POINTS
     je .points
     jmp .done
 
+;;;;;;;;;
+
+;
+; Triangles
+;
 .triangles:
     xor r12d, r12d
 .trianglesLoop:
@@ -611,6 +616,9 @@ _cgxCoreDrawElements:
     add r12d, 3
     jmp .trianglesLoop
 
+;
+; Lines
+;
 .lines:
     xor r12d, r12d
 .linesLoop:
@@ -643,6 +651,9 @@ _cgxCoreDrawElements:
     add r12d, 2
     jmp .linesLoop
 
+;
+; Points
+;
 .points:
     xor r12d, r12d
 .pointsLoop:
@@ -661,6 +672,8 @@ _cgxCoreDrawElements:
 
     inc r12d
     jmp .pointsLoop
+
+;;;;;;;;;
 
 .done:
     add rsp, 80
