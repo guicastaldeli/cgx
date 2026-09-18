@@ -12,6 +12,7 @@ extern VirtualAlloc
 extern VirtualFree
 
 extern _cgxCoreState
+extern _cgxCoreVAOFindBound
 extern CGXState
 
 global _cgxCoreBufferInit
@@ -274,17 +275,38 @@ _cgxCoreBufferBind:
 .found:
     ; Store bound id in state
     cmp r13d, CGX_BUFFER_INDEX
-    je .bindEBO
+    je .bindEbo
 
     ; Bind VBO  
     mov [rel _cgxCoreState + CGXState.boundVBO], r12d
-    mov eax, 1
-    jmp .done
+    
+    push r12
+    push r13
+    call _cgxCoreVAOFindBound
+    pop r13
+    pop r12
+    test rdi, rdi
+    jz .vboDone
+    mov [rdi + VAO.vbo], r12d
 
-.bindEBO:
-    mov [rel _cgxCoreState + CGXState.boundEBO], r12d
+.vboDone:
     mov eax, 1
     jmp .done
+.eboDone:
+    mov eax, 1
+    jmp .done
+.bindEbo:
+    mov [rel _cgxCoreState + CGXState.boundEBO], r12d
+    
+    push r12
+    push r13
+    call _cgxCoreVAOFindBound
+    pop r13
+    pop r12
+    test rdi, rdi
+    jz .eboDone
+    mov [rdi + VAO.ebo], r12d
+    jmp .eboDone
 
 .notFound:
     xor eax, eax
