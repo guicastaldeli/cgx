@@ -14,12 +14,14 @@ extern _cgxCoreVAOFindBound
 extern _cgxCoreBufferGetData
 extern _cgxCoreSetColor
 extern _cgxCoreDrawPixel
+extern _cgxCoreSetDepth
 
 global _cgxCoreDrawElements
 
 struc RasterVertex
     .px         resd 1
     .py         resd 1
+    .z          resd 1
     .r          resd 1
     .g          resd 1
     .b          resd 1
@@ -133,8 +135,10 @@ _cgxCoreFetchVertex:
     mov ecx, [r14 + VAO.attribs + Attrib.offset]
     movss xmm0, [rbx + rcx + 0]
     movss xmm1, [rbx + rcx + 4]
+    movss xmm2, [rbx + rcx + 8]
 
     movss [rbp - 20], xmm1
+    movss [rbp - 24], xmm2
 
     ; NDC to pixel X
     call _cgxCoreNdcToPixelX
@@ -144,6 +148,16 @@ _cgxCoreFetchVertex:
     movss xmm0, [rbp - 20]
     call _cgxCoreNdcToPixelY
     mov [r12 + RasterVertex.py], eax
+
+    ; Convert z_ndc to [0, 1]: z = (z_ndc + 1) * 0.5
+    movss xmm0, [rbp - 24]
+    mov ecx, 0x3F800000
+    movd xmm1, ecx
+    addss xmm0, xmm1
+    mov ecx, 0x3F000000
+    movd xmm1, ecx
+    mulss xmm0, xmm1
+    movss [r12 + RasterVertex.z], xmm0
 
     ; Read color (attr 1)
     mov ecx, [r14 + VAO.attribs + Attrib_size + Attrib.offset]
@@ -191,6 +205,10 @@ _cgxCoreDrawRasterVertex:
     mov ecx, eax
 
     call _cgxCoreSetColor
+
+    ; Set depth from vertex
+    movss xmm0, [rbx + RasterVertex.z]
+    call _cgxCoreSetDepth
 
     ; Draw pixel
     mov ecx, [rbx + RasterVertex.px]
@@ -488,6 +506,20 @@ _cgxCoreRasterTriangle:
     push r12
     push r13
     call _cgxCoreSetColor
+
+    ; Interpolate Z
+    movss xmm5, [r14 + RasterVertex.z + 0]
+    mulss xmm5, xmm0
+    movss xmm6, [r14 + RasterVertex.z + RasterVertex_size]
+    mulss xmm6, xmm2
+    addss xmm5, xmm6
+    movss xmm6, [r14 + RasterVertex.z + RasterVertex_size * 2]
+    mulss xmm6, xmm4
+    addss xmm5, xmm6
+
+    movaps xmm0, xmm5
+    call _cgxCoreSetDepth
+
     mov ecx, r13d
     mov edx, r12d
     call _cgxCoreDrawPixel

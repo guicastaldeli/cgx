@@ -140,7 +140,7 @@ _cgxCoreDepthTest:
     push rbp
     mov rbp, rsp
     push rbx
-    sub rsp, 32
+    sub rsp, 40
 
     ; If depth test disabled, always pass
     cmp byte [rel _cgxCoreState + CGXState.depthTestEnabled], 0
@@ -260,7 +260,7 @@ _cgxCoreDepthTest:
     xor eax, eax
 
 .done:
-    add rsp, 32
+    add rsp, 40
     pop rbx
     pop rbp
     ret

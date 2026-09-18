@@ -79,3 +79,23 @@ CGX_STREAM              equ 2
 ; --- Buffer type ---
 CGX_BUFFER_VERTEX       equ 0
 CGX_BUFFER_INDEX        equ 1
+
+; --- State capabilities ---
+CGX_DEPTH_TEST          equ 0
+CGX_CULL_FACE           equ 1
+CGX_BLEND               equ 2
+
+; --- Depth comparison function ---
+CGX_NEVER               equ 0
+CGX_LESS                equ 1
+CGX_EQUAL               equ 2
+CGX_LEQUAL              equ 3
+CGX_GREATER             equ 4
+CGX_NOTEQUAL            equ 5
+CGX_GEQUAL              equ 6
+CGX_ALWAYS              equ 7
+
+; --- Face culling modes ---
+CGX_FRONT               equ 0
+CGX_BACK                equ 1
+CGX_FRONT_AND_BACK      equ 2

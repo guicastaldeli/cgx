@@ -24,6 +24,11 @@ struc CGXState
     .vaoCapacity            resd 1
     .nextVaoId              resd 1
     .boundVAO               resd 1
+    .depthBuffer            resq 1
+    .depthFunc              resd 1
+    .drawDepth              resd 1
+    .depthTestEnabled       resb 1
+    .padDepth               resb 3
 endstruc
 
 ; --- Buffer struct ---

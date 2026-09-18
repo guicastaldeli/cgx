@@ -12,6 +12,7 @@ extern _cgxCoreState
 extern _cgxCoreGetFramebuffer
 extern _cgxCoreGetWidth
 extern _cgxCoreGetHeight
+extern _cgxCoreDepthTest
 
 global _cgxCoreRgbToBgra
 global _cgxCoreSetColor
@@ -78,7 +79,17 @@ _cgxCoreDrawPixel:
     cmp edx, eax
     jge .out
 
-    ; Comput offset = (y * width + x) * 4
+    ; Depth test (uses ecx, edx, xmm0)
+    movss xmm0, [rel _cgxCoreState + CGXState.drawDepth]
+    push rcx
+    push rdx
+    call _cgxCoreDepthTest
+    test eax, eax
+    pop rdx
+    pop rcx
+    jz .out
+
+    ; Recompute pixel offset = (y * width + x) * 4
     mov eax, edx
     mov r8d, [rel _cgxCoreState + CGXState.width]
     imul eax, r8d

@@ -15,6 +15,7 @@ extern _cgxCoreFreeFramebuffer
 extern _cgxCoreVAOInit
 extern _cgxWin32TimerInit
 extern _cgxCoreBufferInit
+extern _cgxCoreDepthFree
 extern MessageBoxA
 
 global CGXInit

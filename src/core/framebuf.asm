@@ -16,6 +16,9 @@ extern _cgxCoreState
 extern _cgxCoreGetWidth
 extern _cgxCoreGetHeight
 extern _cgxCoreRgbToBgra
+extern _cgxCoreDepthInit
+extern _cgxCoreDepthFree
+extern _cgxCoreDepthClear
 
 global _cgxCoreInitFramebuffer
 global _cgxCoreFreeFramebuffer
@@ -25,8 +28,6 @@ MEM_COMMIT          equ 0x00001000
 MEM_RESERVE         equ 0x00002000
 MEM_RELEASE         equ 0x00008000
 PAGE_READWRITE      equ 0x04
-
-CGX_COLOR_BIT       equ 0x00004000
 
 section .data
     fb_debug_title db "Framebuffer Debug", 0
@@ -70,6 +71,13 @@ _cgxCoreInitFramebuffer:
     jz .fail
 
     mov [rel _cgxCoreState + CGXState.framebuffer], rax
+
+    ; Allocate depth buffer
+    mov ecx, r12d
+    mov edx, ebx
+    call _cgxCoreDepthInit
+    test eax, eax
+    jz .fail
 
     ; Default clear color: dark blue-gray (0.2, 0.2, 0.4, 1.0)
     mov eax, 0x3E4CCCCD         ; 0.2f
@@ -135,7 +143,7 @@ _cgxCoreFreeFramebuffer:
 
     mov rcx, [rel _cgxCoreState + CGXState.framebuffer]
     test rcx, rcx
-    jz .done
+    jz .freeDepth
 
     xor rdx, rdx
     mov r8d, MEM_RELEASE
@@ -143,7 +151,9 @@ _cgxCoreFreeFramebuffer:
 
     mov qword [rel _cgxCoreState + CGXState.framebuffer], 0
 
-.done:
+.freeDepth:
+    call _cgxCoreDepthFree
+
     mov rsp, rbp
     pop rbp
     ret
@@ -158,6 +168,15 @@ _cgxCoreClear:
     mov rbp, rsp
     push rbx
 
+    ; if depth bit set, clear depth buffer
+    test ecx, CGX_DEPTH_BIT
+    jz .skipDepthClear
+
+    push rcx
+    call _cgxCoreDepthClear
+    pop rcx
+
+.skipDepthClear:
     test ecx, CGX_COLOR_BIT
     jz .done
 
@@ -182,38 +201,38 @@ _cgxCoreClear:
     cvttss2si r11d, xmm3     ; A
 
     ; Clamp each to 0..255
-    ; R
     cmp r8d, 0
     jge .OKr
     xor r8d, r8d
 
+        ; R
         .OKr:
             cmp r8d, 255
             jle .DONEr
             mov r8d, 255
         .DONEr:
-            ; G
             cmp r9d, 0
             jge .OKg
             xor r9d, r9d
+        ; G
         .OKg:
             cmp r9d, 255
             jle .DONEg
             mov r9d, 255
         .DONEg:
-            ; B
             cmp r10d, 0
             jge .OKb
             xor r10d, r10d
+        ; B
         .OKb:
             cmp r10d, 255
             jle .DONEb
             mov r10d, 255
         .DONEb:
-            ; A
             cmp r11d, 0
             jge .OKa
             xor r11d, r11d
+        ; A
         .OKa:
             cmp r11d, 255
             jle .DONEa

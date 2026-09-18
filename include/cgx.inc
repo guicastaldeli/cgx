@@ -51,3 +51,8 @@ extern CGXDisableVertexAttribArray
 
 ; --- Draw calls ---
 extern CGXDrawElements
+
+; --- State ---
+extern CGXEnable
+extern CGXDisable
+extern CGXDepthFunc
