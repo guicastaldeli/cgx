@@ -76,7 +76,7 @@ main:
     mov r9d, 0
     call MessageBoxA
 
-    ; --- Create Buffers ---
+    ; --- Create buffers ---
     ; Create VBO
     lea rcx, [rel vertices]
     mov rdx, vertices_size
@@ -107,7 +107,7 @@ main:
     mov r9d, 0
     call MessageBoxA
 
-    ; --- Bind Buffers ---
+    ; --- Bind buffers ---
     ; Bind VBO
     mov ecx, ebx
     call CGXBindVertexBuffer

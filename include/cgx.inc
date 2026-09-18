@@ -48,3 +48,6 @@ extern CGXBindVertexArray
 extern CGXVertexAttribPointer
 extern CGXEnableVertexAttribArray
 extern CGXDisableVertexAttribArray
+
+; --- Draw calls ---
+extern CGXDrawElements

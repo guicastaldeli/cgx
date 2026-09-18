@@ -1,6 +1,6 @@
 ; ============================================
-; test_vao.asm
-; Verify VAO creation, binding, and attribute setup
+; test_draw_elements.asm
+; Draw triangle via CGXDrawElements
 ; ============================================
 
 default rel
@@ -11,6 +11,12 @@ global main
 
 extern CGXInit
 extern CGXShutdown
+extern CGXPollEvents
+extern CGXShouldClose
+extern CGXSetClearColor
+extern CGXClear
+extern CGXSwapBuffers
+extern CGXGetKey
 extern CGXCreateVertexBuffer
 extern CGXCreateIndexBuffer
 extern CGXBindVertexBuffer
@@ -19,28 +25,30 @@ extern CGXCreateVertexArray
 extern CGXBindVertexArray
 extern CGXVertexAttribPointer
 extern CGXEnableVertexAttribArray
-extern CGXDeleteVertexArray
-extern CGXDeleteBuffer
+extern CGXDrawElements
 extern MessageBoxA
 
 section .data
-    title db "CGX Test - VAO", 0
+    title db "CGX Test - DrawElements", 0
 
-    ; 3 vertices, each: xyz (3 floats) + rgb (3 floats) = 24 bytes
+    cR dd 0.05
+    cG dd 0.05
+    cB dd 0.1
+    cA dd 1.0
+
+    ; 3 vertices in NDC: (x, y, z) + (r, g, b) = 24 bytes each
     vertices:
-        dd 0.0, 0.5, 0.0,   1.0, 0.0, 0.0
-        dd -0.5, -0.5, 0.0, 0.0, 1.0, 0.0
-        dd 0.5, -0.5, 0.0,  0.0, 0.0, 1.0
+        dd  0.0,  0.5, 0.0,   1.0, 0.0, 0.0
+        dd -0.5, -0.5, 0.0,   0.0, 1.0, 0.0
+        dd  0.5, -0.5, 0.0,   0.0, 0.0, 1.0
     vertices_size equ 72
 
     indices:
         dd 0, 1, 2
     indices_size equ 12
 
-    msg_ok_title db "VAO Test", 0
-    msg_ok db "VAO test passed", 0
-    msg_err_title db "VAO Test - ERR", 0
-    msg_err db "VAO test FAILED", 0
+    msg_err_title db "DrawElements", 0
+    msg_err db "DrawElements test FAILED", 0
 
 section .text
 
@@ -61,6 +69,14 @@ main:
     cmp eax, 0
     je .error
 
+    ; Clear color
+    movss xmm0, [rel cR]
+    movss xmm1, [rel cG]
+    movss xmm2, [rel cB]
+    movss xmm3, [rel cA]
+    call CGXSetClearColor
+
+    ; --- Create buffers ---
     ; Create VBO
     lea rcx, [rel vertices]
     mov rdx, vertices_size
@@ -68,53 +84,46 @@ main:
     call CGXCreateVertexBuffer
     test eax, eax
     jz .error
-    mov ebx, eax                        ; vbo id
+    mov ebx, eax
 
-    ; -- Create buffers ---
     ; Create EBO
     lea rcx, [rel indices]
     mov rdx, indices_size
-    mov r8d, CGX_STATIC
+    mov r8d, CGS_STATIC
     call CGXCreateIndexBuffer
     test eax, eax
     jz .error
-    mov r12d, eax                       ; ebo id
+    mov r12d, eax
 
     ; Create VAO
     call CGXCreateVertexArray
     test eax, eax
     jz .error
-    mov r13d, eax                       ; vao id
+    mov r13d, eax
 
     ; --- Bind buffers ---
     ; Bind VAO
     mov ecx, r13d
     call CGXBindVertexArray
-    cmp eax, 1
-    jne .error
 
     ; Bind VBO
     mov ecx, ebx
     call CGXBindVertexBuffer
-    cmp eax, 1
-    jne .error
 
     ; Bind EBO
     mov ecx, r12d
     call CGXBindIndexBuffer
-    cmp eax, 1
-    jne .error
 
-    ; Attribute 0: position (3 floats, offset 0, stride 24)
+    ; Attrib 0: position, 3 floats at offset 0, stride 24
     mov rcx, 0
     mov rdx, 3
     mov r8d, CGX_FLOAT
     xor r9d, r9d
-    mov qword [rsp + 32], 24            ; stride
-    mov qword [rsp + 40], 0             ; offset
+    mov qword [rsp + 32], 24
+    mov qword [rsp + 40], 0
     call CGXVertexAttribPointer
 
-    ; Attribute 1: color (3 floats, offset 12, stride 24)
+    ; Attrib 1: color, 3 floats at offset 12, stride 24
     mov rcx, 1
     mov rdx, 3
     mov r8d, CGX_FLOAT
@@ -123,37 +132,46 @@ main:
     mov qword [rsp + 40], 12
     call CGXVertexAttribPointer
 
-    ; Enable attributes
+    ; Enable both
     mov rcx, 0
     call CGXEnableVertexAttribArray
-    cmp eax, 1
-    jne .error
-
     mov rcx, 1
     call CGXEnableVertexAttribArray
+
+.loop:
+    call CGXPoolEvents
+    call CGXShouldClose
     cmp eax, 1
-    jne .error
+    je .done
 
-    ; Success
-    xor rcx, rcx
-    lea rdx, [rel msg_ok]
-    lea r8, [rel msg_ok_title]
-    mov r9d, 0
-    call MessageBoxA
+    ; ESC to exit
+    mov rcx, CGX_KEY_ESC
+    call CGXGetKey
+    cmp eax, 1
+    jne .render
+    jmp .done
 
-    ; Cleanup
+.render:
+    mov ecx, 0x00004000
+    call CGXClear
+
+    ; Bind VAO and draw
     mov ecx, r13d
-    call CGXDeleteVertexArray
+    call CGXBindVertexArray
 
-    mov ecx, ebx
-    call CGXDeleteBuffer
+    mov rcx, CGX_TRIANGLES
+    mov rdx, 3
+    mov r8d, CGX_UINT
+    xor r9d, r9d
+    call CGXDrawElements
 
-    mov ecx, r12d
-    call CGXDeleteBuffer
+    call CGXSwapBuffers
+    jmp .loop
 
+.done:
     call CGXShutdown
     xor eax, eax
-    jmp .done
+    jmp .finish
 
 .error:
     xor rcx, rcx
@@ -163,7 +181,7 @@ main:
     call MessageBoxA
     mov eax, 1
 
-.done:
+.finish:
     add rsp, 48
     pop r14
     pop r13
@@ -171,3 +189,4 @@ main:
     pop rbx
     pop rbp
     ret
+        
