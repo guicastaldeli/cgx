@@ -171,11 +171,14 @@ _cgxCoreDrawElements:
     movss xmm0, [rbx + rcx + 0]     ; x
     movss xmm1, [rbx + rcx + 4]     ; y
 
-    ; NDC to pixel
+    movss [rbp - 80], xmm1
+
+    ; NDC to pixel X
     call _cgxCoreNdcToPixelX
     mov [rbp - 72], eax             ; save px
 
-    movaps xmm0, xmm1
+    ; NDC to pixel Y
+    movss xmm0, [rbp - 80]
     call _cgxCoreNdcToPixelY
     mov [rbp - 76], eax             ; save py
 
