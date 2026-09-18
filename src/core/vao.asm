@@ -22,6 +22,7 @@ global _cgxCoreVAOAttribPointer
 global _cgxCoreVAOEnableAttrib
 global _cgxCoreVAODisableAttrib
 global _cgxCoreVAOGetAttrib
+global _cgxCoreVAOFindBound
 
 MEM_COMMIT                  equ 0x00001000
 MEM_RESERVE                 equ 0x00002000
@@ -322,10 +323,10 @@ _cgxCoreVAOAttribPointer:
     ; stride and offset are 5th and 6th args on stack
     ; [rbp+16] = stride
     ; [rbp+24] = offset
-    mov eax, [rbp + 40]
+    mov eax, [rbp + 48]
     mov [rdi + Attrib.stride], eax
 
-    mov eax, [rbp + 48]
+    mov eax, [rbp + 56]
     mov [rdi + Attrib.offset], eax
 
     mov eax, 1

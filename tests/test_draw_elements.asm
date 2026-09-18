@@ -89,7 +89,7 @@ main:
     ; Create EBO
     lea rcx, [rel indices]
     mov rdx, indices_size
-    mov r8d, CGS_STATIC
+    mov r8d, CGX_STATIC
     call CGXCreateIndexBuffer
     test eax, eax
     jz .error
@@ -139,7 +139,7 @@ main:
     call CGXEnableVertexAttribArray
 
 .loop:
-    call CGXPoolEvents
+    call CGXPollEvents
     call CGXShouldClose
     cmp eax, 1
     je .done

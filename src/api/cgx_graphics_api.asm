@@ -1,7 +1,7 @@
 ; ============================================
 ; api/cgx_graphics_api.asm
 ;   -> CGXSetClearColor, CGXClear, CGXSwapBuffers
-;        CGXPoolEvents, CGXShouldClose
+;        CGXPollEvents, CGXShouldClose
 ;        CGXGetWidth, CGXHeight, CGXSetWindowTitle
 ; ============================================
 

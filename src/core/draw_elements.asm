@@ -26,7 +26,7 @@ section .text
 ; --------------------------------------------
 _cgxCoreNdcToPixelX:
     mov edx, 0x3F800000         ; 1.0
-    movd xmm1, ecx, ecx
+    movd xmm1, edx
     addss xmm0, xmm1            ; ndc_x + 1.0
 
     mov ecx, 0x3F000000         ; 0.5
@@ -34,7 +34,7 @@ _cgxCoreNdcToPixelX:
     mulss xmm0, xmm1
 
     mov ecx, [rel _cgxCoreState + CGXState.width]
-    ctvsi2ss xmm1, ecx
+    cvtsi2ss xmm1, ecx
     mulss xmm0, xmm1
 
     cvttss2si eax, xmm0
@@ -69,7 +69,7 @@ _cgxCoreNdcToPixelY:
 ; --------------------------------------------
 _cgxCoreFloatToByte:
     mov eax, 0x437F0000             ; 255.0f
-    movd xmm1, ecx
+    movd xmm1, eax
     mulss xmm0, xmm1
 
     cvttss2si eax, xmm0
