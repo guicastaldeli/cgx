@@ -82,13 +82,12 @@ _writeIdentity:
     mov [rdi - 64 + 0], eax
     mov [rdi - 64 + 20], eax
     mov [rdi - 64 + 40], eax
-    mov [rdi - 64 + 40], eax
     mov [rdi - 64 + 60], eax
     ret
 
 ; --------------------------------------------
 ; _cgxCoreMatrixMode
-; Input: eax = mode
+; Input: ecx = mode
 ; --------------------------------------------
 _cgxCoreMatrixMode:
     mov [rel _cgxCoreState + CGXState.matrixMode], ecx
@@ -262,13 +261,12 @@ _getCurrentMatrix:
 ; --------------------------------------------
 ; _matrixMultiply
 ; MULTIPLY: dst = a * b (4x4 * 4x4)
-; Input: rdi = dst, rsi = a, rbx = b
+; Input: rdi = dst, rsi = a, rdx = b
 ; Column-major
 ; --------------------------------------------
 _matrixMultiply:
     push rbp
     mov rbp, rsp
-    push rbx
     sub rsp, 64
 
     ; Save ptrs
@@ -300,7 +298,7 @@ _matrixMultiply:
     shufps xmm6, xmm6, 0x55
     ; xmm7 = (b2j, b2j, b2j, b2j)
     movaps xmm7, xmm4
-    shufps xmm7, xmm7 0xAA
+    shufps xmm7, xmm7, 0xAA
     ; xmm8 = (b3j, b3j, b3j, b3j)
     movaps xmm8, xmm4
     shufps xmm8, xmm8, 0xFF
@@ -331,7 +329,6 @@ _matrixMultiply:
 
 .done:
     add rsp, 64
-    pop rbx
     pop rbp
     ret
 
@@ -368,7 +365,7 @@ _cgxCoreMultMatrix:
     sub rsp, 128
 
     ; Save M ptr
-    movm [rbp - 8], rcx
+    mov [rbp - 8], rcx
 
     ; Get current matrix ptr
     call _getCurrentMatrix
@@ -412,7 +409,7 @@ _cgxCoreTranslate:
     movss [rdi + 52], xmm1      ; M[3][1] = y
     movss [rdi + 56], xmm2      ; M[3][2] = z
 
-    ; current = current * r
+    ; current = current * T
     lea rcx, [rbp - 128]
     call _cgxCoreMultMatrix
 
@@ -430,7 +427,7 @@ _cgxCoreScale:
     sub rsp, 128
 
     lea rdi, [rbp - 128]
-    call _writeIndentity
+    call _writeIdentity
 
     lea rdi, [rbp - 128]
     movss [rdi + 0], xmm0         ; M[0][0] = x
@@ -459,8 +456,8 @@ _cgxCoreRotate:
     movss [rbp - 12], xmm2          ; ay
     movss [rbp - 16], xmm3          ; az
 
-    ; angle_rad = angle * DEG_TO_RAG
-    mov eax, DEG_TO_RAG
+    ; angle_rad = angle * DEG_TO_RAD
+    mov eax, DEG_TO_RAD
     movd xmm4, eax
     mulss xmm0, xmm4
     movss [rbp - 20], xmm0          ; angle_rad
@@ -520,9 +517,9 @@ _cgxCoreRotate:
     ; R[2][2] = c + nz^2*(1-c)
 
     ; Compute 1-c
-    movss xmm4, [rbp - 64]          ; c
+    movss xmm4, [rbp - 24]          ; c
     mov eax, ONE_F
-    movs xmm5, eax
+    movd xmm5, eax
     subss xmm5, xmm4                ; 1-c
 
     ; Load nx, ny, nz, s, c into xmm0..xmm2, xmm3, xmm4
@@ -576,8 +573,8 @@ _cgxCoreRotate:
     movaps xmm6, xmm1
     mulss xmm6, xmm0
     mulss xmm6, xmm5
-    movaps xmm6, xmm2
-    mulss xmm7, xmm2
+    movaps xmm7, xmm2
+    mulss xmm7, xmm3
     addss xmm6, xmm7
     movss [rdi + 16], xmm6
 
@@ -630,9 +627,10 @@ _cgxCoreRotate:
     lea rcx, [rbp - 128]
     call _cgxCoreMultMatrix
 
-.skipRotaion:
+.skipRotation:
     add rsp, 192
     pop rbp
+    ret
 
 ; --------------------------------------------
 ; _cgxCorePerspective
@@ -662,7 +660,7 @@ _cgxCorePerspective:
     fld dword [rsp - 4]
     fptan                       ; ST(0) = 1.0, ST(1) = tan(x)
     fstp st0                    ; pop the 1.0
-    fstp dword                  ; store tan
+    fstp dword [rsp - 8]        ; store tan
 
     ; f = 1.0 / tan
     mov eax, ONE_F
@@ -702,7 +700,7 @@ _cgxCorePerspective:
 
     ; M[2][3] = -1.0
     mov eax, 0xBF800000
-    mov [rdi + 44], eax
+    mov dword [rdi + 44], eax
 
     ; M[3][2] = (2 * far * near) / (near - far)
     movaps xmm5, xmm3

@@ -62,3 +62,10 @@ extern CGXMatrixMode
 extern CGXLoadIdentity
 extern CGXPushMatrix
 extern CGXPopMatrix
+extern CGXLoadMatrix
+extern CGXMultMatrix
+extern CGXTranslate
+extern CGXRotate
+extern CGXScale
+extern CGXPerspective
+extern CGXOrtho
