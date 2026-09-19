@@ -321,8 +321,8 @@ _cgxCoreVAOAttribPointer:
     mov [rdi + Attrib.normalized], r11b
 
     ; stride and offset are 5th and 6th args on stack
-    ; [rbp+16] = stride
-    ; [rbp+24] = offset
+    ; [rbp+48] = stride
+    ; [rbp+56] = offset
     mov eax, [rbp + 48]
     mov [rdi + Attrib.stride], eax
 
