@@ -30,7 +30,9 @@ struc RasterVertex
 endstruc
 
 section .bss
+    alignb 16 
     rasterVerts     resb RasterVertex_size * 3
+    alignb 16
     mvpCache        resb 64
 
 section .text
@@ -117,7 +119,7 @@ _cgxCoreFetchVertex:
     mov rbp, rsp
     push rbx
     push r12
-    sub rsp, 32
+    sub rsp, 48
 
     mov r12, rdi                ; dest ptr
 
@@ -154,20 +156,20 @@ _cgxCoreFetchVertex:
     divss xmm2, xmm3
 
     ; Save NDC y and z
-    movss [rbp - 20], xmm1
-    movss [rbp - 24], xmm2
+    movss [rbp - 48], xmm1
+    movss [rbp - 52], xmm2
 
     ; NDC to pixel X
     call _cgxCoreNdcToPixelX
     mov [r12 + RasterVertex.px], eax
 
     ; NDC to pixel Y
-    movss xmm0, [rbp - 20]
+    movss xmm0, [rbp - 48]
     call _cgxCoreNdcToPixelY
     mov [r12 + RasterVertex.py], eax
 
     ; Convert z_ndc to [0, 1]: z = (z_ndc + 1) * 0.5
-    movss xmm0, [rbp - 24]
+    movss xmm0, [rbp - 52]
     mov ecx, 0x3F800000
     movd xmm1, ecx
     addss xmm0, xmm1
@@ -192,7 +194,7 @@ _cgxCoreFetchVertex:
     call _cgxCoreFloatToByte
     mov [r12 + RasterVertex.b], eax
 
-    add rsp, 32
+    add rsp, 48
     pop r12
     pop rbx
     pop rbp
