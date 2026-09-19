@@ -56,3 +56,9 @@ extern CGXDrawElements
 extern CGXEnable
 extern CGXDisable
 extern CGXDepthFunc
+
+; --- Matrix ---
+extern CGXMatrixMode
+extern CGXLoadIdentity
+extern CGXPushMatrix
+extern CGXPopMatrix

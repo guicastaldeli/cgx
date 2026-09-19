@@ -99,3 +99,8 @@ CGX_ALWAYS              equ 7
 CGX_FRONT               equ 0
 CGX_BACK                equ 1
 CGX_FRONT_AND_BACK      equ 2
+
+; --- Matrix modes ---
+CGX_MODELVIEW           equ 0
+CGX_PROJECTION          equ 1
+CGX_TEXTURE             equ 2

@@ -29,6 +29,12 @@ struc CGXState
     .drawDepth              resd 1
     .depthTestEnabled       resb 1
     .padDepth               resb 3
+    .matrixMode             resd 1
+    .mvTop                  resd 1
+    .projTop                resd 1
+    .padM                   resd 1
+    .mvStack                resb 64 * 32
+    .projStack              resb 64 * 32
 endstruc
 
 ; --- Buffer struct ---

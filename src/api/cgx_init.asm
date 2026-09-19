@@ -16,6 +16,7 @@ extern _cgxCoreVAOInit
 extern _cgxWin32TimerInit
 extern _cgxCoreBufferInit
 extern _cgxCoreDepthFree
+extern _cgxCoreMatrixInit
 extern MessageBoxA
 
 global CGXInit
@@ -75,6 +76,11 @@ CGXInit:
 
     ; Init VAO pool
     call _cgxCoreVAOInit
+    test eax, eax
+    jz .fail
+
+    ; Init matrix stack
+    call _cgxCoreMatrixInit
     test eax, eax
     jz .fail
 
