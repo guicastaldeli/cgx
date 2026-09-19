@@ -19,16 +19,18 @@ struc CGXState
     .nextBufferId           resd 1
     .boundVBO               resd 1
     .boundEBO               resd 1
+    .pad1                   resd 1
     .vaoPool                resq 1
     .vaoCount               resd 1
     .vaoCapacity            resd 1
     .nextVaoId              resd 1
     .boundVAO               resd 1
+    .pad2                   resd 1
     .depthBuffer            resq 1
     .depthFunc              resd 1
     .drawDepth              resd 1
     .depthTestEnabled       resb 1
-    .padDepth               resb 3
+    .padDepth               resb 15
     .matrixMode             resd 1
     .mvTop                  resd 1
     .projTop                resd 1

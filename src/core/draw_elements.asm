@@ -136,10 +136,24 @@ _cgxCoreFetchVertex:
 
     ; Read position (attr 0)
     mov ecx, [r14 + VAO.attribs + Attrib.offset]
-    movss xmm0, [rbx + rcx + 0]
-    movss xmm1, [rbx + rcx + 4]
-    movss xmm2, [rbx + rcx + 8]
+    movss xmm0, [rbx + rcx + 0]     ; x
+    movss xmm1, [rbx + rcx + 4]     ; y
+    movss xmm2, [rbx + rcx + 8]     ; z
 
+    ; w = 1.0
+    mov eax, 0x3F800000
+    movd xmm3, eax
+
+    ; v_clip = MVP * (x, y, z, 1)
+    lea rdi, [rel mvpCache]
+    call _matrixMultiplyVec4
+
+    ; Perspective divide: (x/w, y/w, z/w)
+    divss xmm0, xmm3
+    divss xmm1, xmm3
+    divss xmm2, xmm3
+
+    ; Save NDC y and z
     movss [rbp - 20], xmm1
     movss [rbp - 24], xmm2
 
@@ -161,10 +175,6 @@ _cgxCoreFetchVertex:
     movd xmm1, ecx
     mulss xmm0, xmm1
     movss [r12 + RasterVertex.z], xmm0
-
-    ; v_clip = MVP * (x, y, z, 1)
-    lea rdi, [rel mvpCache]
-    call _matrixMultiplyVec4
 
     ; Read color (attr 1)
     mov ecx, [r14 + VAO.attribs + Attrib_size + Attrib.offset]

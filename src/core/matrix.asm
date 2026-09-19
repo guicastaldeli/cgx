@@ -782,8 +782,8 @@ _cgxCoreOrtho:
     sub rsp, 128
 
     ; Load near, far from stack
-    movss xmm4, [rbp + 16]      ; n
-    movss xmm5, [rbp + 24]      ; f
+    movss xmm4, [rbp + 48]      ; n
+    movss xmm5, [rbp + 56]      ; f
 
     ; Zero temp at rbp-128
     lea rdi, [rbp - 128]
