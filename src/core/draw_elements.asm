@@ -15,6 +15,8 @@ extern _cgxCoreBufferGetData
 extern _cgxCoreSetColor
 extern _cgxCoreDrawPixel
 extern _cgxCoreSetDepth
+extern _matrixMultiply
+extern _matrixMultiplyVec4
 
 global _cgxCoreDrawElements
 
@@ -29,6 +31,7 @@ endstruc
 
 section .bss
     rasterVerts     resb RasterVertex_size * 3
+    mvpCache        resb 64
 
 section .text
 
@@ -158,6 +161,10 @@ _cgxCoreFetchVertex:
     movd xmm1, ecx
     mulss xmm0, xmm1
     movss [r12 + RasterVertex.z], xmm0
+
+    ; v_clip = MVP * (x, y, z, 1)
+    lea rdi, [rel mvpCache]
+    call _matrixMultiplyVec4
 
     ; Read color (attr 1)
     mov ecx, [r14 + VAO.attribs + Attrib_size + Attrib.offset]
@@ -595,6 +602,22 @@ _cgxCoreDrawElements:
     test rax, rax
     jz .done
     mov r13, rax
+
+    ; --- Compute MVP = PROJECTION * MODELVIEW ---
+    mov eax, [rel _cgxCoreState + CGXState.mvTop]
+    shl eax, 6
+    lea rbx, [rel _cgxCoreState + CGXState.mvStack]
+    add rbx, rax                    ; rbx = MV ptr
+
+    mov eax, [rel _cgxCoreState + CGXState.projTop]
+    shl eax, 6
+    lea rcx, [rel _cgxCoreState + CGXState.projStack]
+    add rcx, rax                    ; rcx = PROJ ptr
+
+    lea rdi, [rel mvpCache]
+    mov rsi, rcx                    ; a = PROJ
+    mov rdx, rbx                    ; b = MV
+    call _matrixMultiply            ; MVP = PROJ * MV
 
     ; Dispatch
     mov eax, [rbp - 48]

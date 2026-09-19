@@ -23,6 +23,8 @@ global _cgxCoreRotate
 global _cgxCoreScale
 global _cgxCorePerspective
 global _cgxCoreOrtho
+global _matrixMultiply
+global _matrixMultiplyVec4
 
 STACK_DEPTH         equ 32
 MATRIX_SIZE         equ 64              ; 16 floats * 4 bytes
@@ -330,6 +332,52 @@ _matrixMultiply:
 .done:
     add rsp, 64
     pop rbp
+    ret
+
+; --------------------------------------------
+; _matrixMultiplyVec4
+; Input: rdi = matrix ptr, xmm0..xmm3 = vector(x, y, z, w)
+; Output: xmm0..xmm3 = result (x', y', z', w')
+; Column-major: result = M * v
+; --------------------------------------------
+_matrixMultiplyVec4:
+    ; Load vector components into xmm4 (broadcast pattern)
+    ; col0 = (x, x, x, x)
+    movaps xmm4, xmm0
+    shufps xmm4, xmm4, 0x00
+    ; col1 = (y, y, y, y)
+    movaps xmm5, xmm1
+    shufps xmm5, xmm5, 0x00
+    ; col2 = (z, z, z, z)
+    movaps xmm6, xmm2
+    shufps xmm6, xmm6, 0x00
+    ; col3 = (w, w, w, w)
+    movaps xmm7, xmm3
+    shufps xmm7, xmm7, 0x00
+
+    ; result = col0 * M[0] + col1 * M[1] + col2 * M[2] + col3 * M[3]
+    movaps xmm0, [rdi + 0]
+    mulps xmm0, xmm4
+    movaps xmm1, [rdi + 16]
+    mulps xmm1, xmm5
+    addps xmm0, xmm1
+    movaps xmm1, [rdi + 32]
+    mulps xmm1, xmm6
+    addps xmm0, xmm1
+    movaps xmm1, [rdi + 48]
+    mulps xmm1, xmm7
+    addps xmm0, xmm1
+
+    ; xmm0 now holds (x', y', z', w')
+    ; Split into xmm0..xmm3
+    movaps xmm1, xmm0
+    shufps xmm1, xmm1, 0x55         ; y'
+    movaps xmm2, xmm0
+    shufps xmm2, xmm2, 0xAA         ; z'
+    movaps xmm3, xmm0
+    shufps xmm3, xmm3, 0xFF         ; w'
+    shufps xmm0, xmm0, 0x00         ; x'
+
     ret
 
 ; --------------------------------------------
