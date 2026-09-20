@@ -105,7 +105,24 @@ _cgxCoreDrawPixel:
     call _cgxCoreRgbToBgra
     ; eax = src as 0xAARRGGBB (BGRA in memory order)
 
-    ; Check if blending is enabled
+    movss xmm0, [rel _cgxCoreState + CGXState.drawAlpha]
+    mov edi, 0x437F0000
+    movd xmm1, edi
+    mulss xmm0, xmm1
+    cvttss2si edi, xmm0
+    cmp edi, 0
+    jge .a1
+    xor edi, edi
+
+.a1:
+    cmp edi, 255
+    jle .a2
+    mov edi, 255
+.a2:
+    shl edi, 24
+    and eax, 0x00FFFFFF
+    or eax, edi
+
     cmp dword [rel _cgxCoreState + CGXState.blendEnabled], 0
     je .writeDirect
 
@@ -131,7 +148,7 @@ _cgxCoreDrawPixel:
     and ecx, 0xFF               ; dst.r
     call _blendChannel
     shl eax, 16
-    mov r10d, eax               ; save blended red
+    mov r11d, eax               ; save blended red
 
     ; Green channel
     mov edx, [rbp - 24]
@@ -142,7 +159,7 @@ _cgxCoreDrawPixel:
     and ecx, 0xFF               ; dst.g
     call _blendChannel
     shl eax, 8
-    or r10d, eax
+    or r11d, eax
 
     ; Blue channel
     mov edx, [rbp - 24]
@@ -150,14 +167,14 @@ _cgxCoreDrawPixel:
     mov ecx, r9d
     and ecx, 0xFF               ; dst.b
     call _blendChannel
-    or r10d, eax
+    or r11d, eax
 
     ; Alpha
     mov eax, [rbp - 24]
     and eax, 0xFF000000
-    or r10d, eax
+    or r11d, eax
 
-    mov [r8], eax
+    mov [r8], r11d
     jmp .out
 
 .writeDirect:
@@ -257,6 +274,8 @@ _computeFactor:
     shr eax, 24
     and eax, 0xFF
     neg eax
+    add eax, 256
+    ret
 .dstAlpha:
     mov eax, [rbp - 28]
     shr eax, 24
@@ -391,6 +410,3 @@ _cgxCoreDrawLine:
     pop rbx
     pop rbp
     ret
-
-    
-
