@@ -24,7 +24,7 @@ CGXSetColor:
 
 ; --------------------------------------------
 ; CGXDrawPixel
-; Input rcx = x, rdx = y
+; Input: ecx = x, edx = y
 ; Uses current draw color...
 ; --------------------------------------------
 CGXDrawPixel:

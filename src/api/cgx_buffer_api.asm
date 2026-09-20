@@ -30,7 +30,7 @@ CGXCreateVertexBuffer:
 
 ; --------------------------------------------
 ; CGXCreateIndexBuffer
-; Index: rcx = data ptr, rdx = size bytes, r8 = usage
+; Input: rcx = data ptr, rdx = size bytes, r8 = usage
 ; Output: eax = id (>0), 0 on fail
 ; --------------------------------------------
 CGXCreateIndexBuffer:
