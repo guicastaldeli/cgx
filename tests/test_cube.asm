@@ -47,16 +47,15 @@ section .data
 
     ; Vertices: pos.x, pos.y, pos.z, col.r col.g, col.b (24 bytes each)
     vertices:
-        ; 8 corners of a unit cube (-0.5 to +0.5)
-        dd -0.5, -0.5, -0.5,   1.0, 0.0, 0.0    ; 0: red
-        dd  0.5, -0.5, -0.5,   0.0, 1.0, 0.0    ; 1: green
-        dd  0.5,  0.5, -0.5,   0.0, 0.0, 1.0    ; 2: blue
-        dd -0.5,  0.5, -0.5,   1.0, 1.0, 0.0    ; 3: yellow
-        dd -0.5, -0.5,  0.5,   1.0, 0.0, 1.0    ; 4: magenta
-        dd  0.5, -0.5,  0.5,   0.0, 1.0, 1.0    ; 5: cyan
-        dd  0.5,  0.5,  0.5,   1.0, 1.0, 1.0    ; 6: white
-        dd -0.5,  0.5,  0.5,   0.5, 0.5, 0.5    ; 7: gray
-    vertices_size equ 8 * 24
+        dd -0.5, -0.5, -0.5,   1.0, 0.0, 0.0, 1.0
+        dd  0.5, -0.5, -0.5,   0.0, 1.0, 0.0, 1.0
+        dd  0.5,  0.5, -0.5,   0.0, 0.0, 1.0, 1.0
+        dd -0.5,  0.5, -0.5,   1.0, 1.0, 0.0, 1.0
+        dd -0.5, -0.5,  0.5,   1.0, 0.0, 1.0, 1.0
+        dd  0.5, -0.5,  0.5,   0.0, 1.0, 1.0, 1.0
+        dd  0.5,  0.5,  0.5,   1.0, 1.0, 1.0, 1.0
+        dd -0.5,  0.5,  0.5,   0.5, 0.5, 0.5, 1.0
+    vertices_size equ 8 * 28
 
     ; --- Indices: 12 triangles (36 indices) ---
     indices:
@@ -180,17 +179,17 @@ main:
     mov edx, 3
     mov r8d, CGX_FLOAT
     xor r9d, r9d
-    mov qword [rsp + 32], 24
+    mov qword [rsp + 32], 28
     mov qword [rsp + 40], 0
     call CGXVertexAttribPointer
 
-    ; Attrib 1: color (3 floats at offset 12)
+    ; Attrib 1: color (4 floats at offset 12)
     mov rcx, 1
-    mov rdx, 3
+    mov rdx, 4
     mov r8d, CGX_FLOAT
     xor r9d, r9d
-    mov qword [rsp + 32], 24
-    mov qword [rsp + 40], 12
+    mov qword [rsp + 32], 28
+    mov qword [rsp + 40], 0
     call CGXVertexAttribPointer
 
     mov rcx, 0

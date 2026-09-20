@@ -15,6 +15,7 @@ extern _cgxCoreBufferGetData
 extern _cgxCoreSetColor
 extern _cgxCoreDrawPixel
 extern _cgxCoreSetDepth
+extern _cgxCoreSetAlpha
 extern _matrixMultiply
 extern _matrixMultiplyVec4
 
@@ -27,6 +28,7 @@ struc RasterVertex
     .r          resd 1
     .g          resd 1
     .b          resd 1
+    .a          resd 1 
 endstruc
 
 section .bss
@@ -128,7 +130,7 @@ _cgxCoreFetchVertex:
     mov eax, [r14 + VAO.attribs + Attrib.stride]
     test eax, eax
     jnz .haveStride
-    mov eax, 24
+    mov eax, 28
 .haveStride:
     imul eax, ebx
     mov rbx, r13
@@ -176,21 +178,30 @@ _cgxCoreFetchVertex:
     mulss xmm0, xmm1
     movss [r12 + RasterVertex.z], xmm0
 
-    ; Read color (attr 1)
+    ; Read color (attr 1, size 4: RGBA)
+    ; R
     mov ecx, [r14 + VAO.attribs + Attrib_size + Attrib.offset]
     movss xmm0, [rbx + rcx + 0]
     call _cgxCoreFloatToByte
     mov [r12 + RasterVertex.r], eax
 
+    ; G
     mov ecx, [r14 + VAO.attribs + Attrib_size + Attrib.offset]
     movss xmm0, [rbx + rcx + 4]
     call _cgxCoreFloatToByte
     mov [r12 + RasterVertex.g], eax
 
+    ; B
     mov ecx, [r14 + VAO.attribs + Attrib_size + Attrib.offset]
     movss xmm0, [rbx + rcx + 8]
     call _cgxCoreFloatToByte
     mov [r12 + RasterVertex.b], eax
+
+    ; A
+    mov ecx, [r14 + VAO.attribs + Attrib_size + Attrib.offset]
+    movss xmm0, [rbx + rcx + 12]
+    call _cgxCoreFloatToByte
+    mov [r12 + RasterVertex.a], eax
 
     add rsp, 32
     pop r12
@@ -223,6 +234,14 @@ _cgxCoreDrawRasterVertex:
 
     call _cgxCoreSetColor
 
+    ; Set alpha
+    mov eax, [rbx + RasterVertex.a]
+    cvtsi2ss xmm0, eax
+    mov eax, 0x3B808081         ; 1/255 as float
+    movd xmm1, eax
+    mulss xmm0, xmm1
+    call _cgxCoreSetAlpha
+
     ; Set depth from vertex
     movss xmm0, [rbx + RasterVertex.z]
     call _cgxCoreSetDepth
@@ -250,7 +269,7 @@ _cgxCoreRasterTriangle:
     push r13
     push r14
     push r15
-    sub rsp, 96
+    sub rsp, 128
 
     mov r14, rdi
 
@@ -305,7 +324,7 @@ _cgxCoreRasterTriangle:
 
 .cull:
     ; Skip this triangle
-    add rsp, 96
+    add rsp, 128
     pop r15
     pop r14
     pop r13
@@ -584,6 +603,11 @@ _cgxCoreRasterTriangle:
     push r13
     call _cgxCoreSetColor
 
+    ; Save barycentric weights
+    movss [rbp - 112], xmm0
+    movss [rbp - 116], xmm2
+    movss [rbp - 120], xmm4
+
     ; Interpolate Z
     movss xmm5, [r14 + RasterVertex.z + 0]
     mulss xmm5, xmm0
@@ -597,6 +621,30 @@ _cgxCoreRasterTriangle:
     movaps xmm0, xmm5
     call _cgxCoreSetDepth
 
+    ; Restore barycentric weights
+    movss xmm0, [rbp - 112]
+    movss xmm2, [rbp - 116]
+    movss xmm4, [rbp - 120]
+
+    ; Interpolate alpha
+    movss xmm5, [r14 + RasterVertex.a + 0]
+    mulss xmm5, xmm0
+    movss xmm6, [r14 + RasterVertex.a + RasterVertex_size]
+    mulss xmm6, xmm2
+    addss xmm5, xmm6
+    movss xmm6, [r14 + RasterVertex.a + RasterVertex_size * 2]
+    mulss xmm6, xmm4
+    addss xmm5, xmm6
+
+    ; Convert 0-255 to 0.0-1.0
+    mov eax, 0x3B808081
+    movd xmm1, eax
+    mulss xmm5, xmm1
+    
+    movaps xmm0, xmm5
+    call _cgxCoreSetAlpha
+
+    ; Draw
     mov ecx, r13d
     mov edx, r12d
     call _cgxCoreDrawPixel
@@ -611,7 +659,7 @@ _cgxCoreRasterTriangle:
     jmp .rowLoop
 
 .done:
-    add rsp, 96
+    add rsp, 128
     pop r15
     pop r14
     pop r13

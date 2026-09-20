@@ -38,6 +38,10 @@ struc CGXState
     .cullFaceEnabled        resd 1
     .cullMode               resd 1
     .frontFace              resd 1
+    .blendEnabled           resd 1
+    .blendSrc               resd 1
+    .blendDst               resd 1
+    .drawAlpha              resd 1
 endstruc
 
 ; --- Buffer struct ---

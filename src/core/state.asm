@@ -12,6 +12,8 @@ global _cgxCoreSetClearColor
 global _cgxCoreGetFramebuffer
 global _cgxCoreGetWidth
 global _cgxCoreGetHeight
+global _cgxCoreSetAlpha
+global _cgxCoreSetColorRGBA
 
 ; --- State instance ---
 section .bss
@@ -61,4 +63,21 @@ _cgxCoreGetWidth:
 ; --------------------------------------------
 _cgxCoreGetHeight:
     mov eax, [rel _cgxCoreState + CGXState.height]
+    ret
+
+; --------------------------------------------
+; _cgxCoreSetAlpha
+; Input: xmm0 = alpha [0, 1]
+; --------------------------------------------
+_cgxCoreSetAlpha:
+    movss [rel _cgxCoreState + CGXState.drawAlpha], xmm0
+    ret
+
+; --------------------------------------------
+; _cgxCoreSetColorRBGA
+; Input: ecx = 0x00RRGGBB, xmm0 = alpha
+; --------------------------------------------
+_cgxCoreSetColorRGBA:
+    mov [rel _cgxCoreState + CGXState.drawColor], ecx
+    movss [rel _cgxCoreState + CGXState.drawAlpha], xmm0
     ret

@@ -73,3 +73,6 @@ extern CGXOrtho
 ; --- Culling ---
 extern CGXCullFace
 extern CGXFrontFace
+
+; --- Blending ---
+extern CGXBlendFunc

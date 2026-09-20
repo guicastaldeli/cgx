@@ -63,6 +63,12 @@ _cgxCoreMatrixInit:
     mov dword [rel _cgxCoreState + CGXState.cullMode], CGX_BACK
     mov dword [rel _cgxCoreState + CGXState.frontFace], CGX_CCW
 
+    ; Blending defaults: off, src=ONE, dst=ZERO
+    mov dword [rel _cgxCoreState + CGXState.blendEnabled], 0
+    mov dword [rel _cgxCoreState + CGXState.blendSrc], CGX_ONE
+    mov dword [rel _cgxCoreState + CGXState.blendDst], CGX_ZERO
+    mov dword [rel _cgxCoreState + CGXState.drawAlpha], 0x3F800000      ; 1.0f alpha value
+
     mov eax, 1
     add rsp, 40
     pop rbx

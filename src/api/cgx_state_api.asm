@@ -16,6 +16,7 @@ global CGXDisable
 global CGXDepthFunc
 global CGXCullFace
 global CGXFrontFace 
+global CGXBlendFunc
 
 section .text
 
@@ -23,10 +24,12 @@ section .text
 ; CGXEnable
 ; Input: rcx = cap (CGX_DEPTH_TEST, CGX_CULL_FACE, ...)
 CGXEnable:
-    cmp ecx, CGX_DEPTH_TEST
+    cmp ecx, CGX_DEPTH_TEST     ; DEPTH_TEST
     je .depth
-    cmp ecx, CGX_CULL_FACE
+    cmp ecx, CGX_CULL_FACE      ; CULL_FACE
     je .cull
+    cmp ecx, CGX_BLEND          ; BLEND
+    je .blend
     xor eax, eax
     ret
 
@@ -40,15 +43,22 @@ CGXEnable:
     mov eax, 1
     ret
 
+.blend:
+    mov dword [rel _cgxCoreState + CGXState.blendEnabled], 1
+    mov eax, 1
+    ret
+
 ; --------------------------------------------
 ; CGXDisable
 ; Input: rcx = cap
 ; --------------------------------------------
 CGXDisable:
-    cmp ecx, CGX_DEPTH_TEST
+    cmp ecx, CGX_DEPTH_TEST     ; DEPTH_TEST
     je .depth
-    cmp ecx, CGX_CULL_FACE
+    cmp ecx, CGX_CULL_FACE      ; CULL_FACE
     je .cull
+    cmp ecx, CGX_BLEND          ; BLEND
+    je .blend
     xor eax, eax
     ret
 
@@ -59,6 +69,11 @@ CGXDisable:
 
 .cull:
     mov dword [rel _cgxCoreState + CGXState.cullFaceEnabled], 0
+    mov eax, 1
+    ret
+
+.blend:
+    mov dword [rel _cgxCoreState + CGXState.blendEnabled], 0
     mov eax, 1
     ret
 
@@ -86,5 +101,15 @@ CGXCullFace:
 ; --------------------------------------------
 CGXFrontFace:
     mov [rel _cgxCoreState + CGXState.frontFace], ecx
+    mov eax, 1
+    ret
+
+; --------------------------------------------
+; CGXBlendFunc
+; Input: rcx = srcFactor, rdx = dstFactor
+; --------------------------------------------
+CGXBlendFunc:
+    mov [rel _cgxCoreState + CGXState.blendSrc], ecx
+    mov [rel _cgxCoreState + CGXState.blendDst], edx
     mov eax, 1
     ret

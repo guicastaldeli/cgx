@@ -103,12 +103,196 @@ _cgxCoreDrawPixel:
     ; Convert current color 0x00RRGGBB -> BGRA
     mov ecx, [rel _cgxCoreState + CGXState.drawColor]
     call _cgxCoreRgbToBgra
+    ; eax = src as 0xAARRGGBB (BGRA in memory order)
 
+    ; Check if blending is enabled
+    cmp dword [rel _cgxCoreState + CGXState.blendEnabled], 0
+    je .writeDirect
+
+    ; --- Blending path ---
+    ; Extract src channels (0-255)
+    ; Memory order (little-endian): byte0=B, byte1=G, byte2=R, byte3=A
+    ; eax: bits 0-7 = B, 8-15 = G, 16-23 = R, 24-31 = A
+
+    mov r9d, [r8]               ; dst color
+
+    ; Compute src factor and dst factor for each channel...
+    ; Save src and dst for factor lookups
+    mov [rbp - 24], eax         ; src (AARRGGBB)
+    mov [rbp - 28], r9d         ; dst
+
+    ; Color channels
+    ; Red channel
+    mov edx, eax
+    shr edx, 16
+    and edx, 0xFF               ; src.r
+    mov ecx, r9d
+    shr ecx, 16
+    and ecx, 0xFF               ; dst.r
+    call _blendChannel
+    shl eax, 16
+    mov r10d, eax               ; save blended red
+
+    ; Green channel
+    mov edx, [rbp - 24]
+    shr edx, 8
+    and edx, 0xFF               ; src.g
+    mov ecx, r9d
+    shr ecx, 8
+    and ecx, 0xFF               ; dst.g
+    call _blendChannel
+    shl eax, 8
+    or r10d, eax
+
+    ; Blue channel
+    mov edx, [rbp - 24]
+    and edx, 0xFF               ; src.b
+    mov ecx, r9d
+    and ecx, 0xFF               ; dst.b
+    call _blendChannel
+    or r10d, eax
+
+    ; Alpha
+    mov eax, [rbp - 24]
+    and eax, 0xFF000000
+    or r10d, eax
+
+    mov [r8], eax
+    jmp .out
+
+.writeDirect:
     mov [r8], eax
 
 .out:
     mov rsp, rbp
     pop rbp
+    ret
+
+; --------------------------------------------
+; _blendChannel
+; Input: edx = src value (0-255), ecx = dst value (0-255)
+; Output: eax = blended value (0-255)
+; Reads blendSrc, blendDst, drawAlpha from state
+; Clobbers: eax, ebx, edi, r10, r11, xmm0-2
+; --------------------------------------------
+_blendChannel:
+    ; srcFactor and dstFactor need to be computed for this channel.
+    ; for factors ZERO, ONE, SRC_ALPHA, ONE_MINUS_SRC_ALPHA,
+    ; SRC_COLOR, ONE_MINUS_SRC_COLOR, DST_ALPHA, etc
+
+    ; --- Compute srcFactor ---
+    mov eax, [rel _cgxCoreState + CGXState.blendSrc]
+    call _computeFactor             ; returns eax = factor * 256
+    mov edi, eax                    ; srcFactor * 256
+
+    ; --- Compute dstFactor ---
+    mov eax, [rel _cgxCoreState + CGXState.blendDst]
+    push rdx
+    push rcx
+    mov edx, [rbp - 24]             ; src
+    mov ecx, [rbp - 28]             ; dst
+    call _computeFactor
+    pop rcx
+    pop rdx
+
+    ; --- Blend: out (src * srcFactor + dst * dstFactor) / 256 ---
+    mov ebx, edx
+    imul ebx, edi                   ; src * srcFactor
+    mov r10d, eax
+    imul r10d, ecx                  ; dst * dstFactor
+    add ebx, r10d
+    shr ebx, 8                      ; divide by 256, back to 0-255 range
+
+    ; Clamp
+    cmp ebx, 255
+    jbe .ok
+    mov ebx, 255
+
+.ok:
+    mov eax, ebx
+    ret
+
+; --------------------------------------------
+; _computeFactor
+; Input: eax = factor enum
+; Uses [rbp - 24] = src, [rbp - 28] = dst
+; Output: eax = factor value * 256 (0-256)
+; --------------------------------------------
+_computeFactor:
+    cmp eax, CGX_ZERO                       ; ZERO
+    je .zero
+    cmp eax, CGX_ONE                        ; ONE
+    je .one
+    cmp eax, CGX_SRC_ALPHA                  ; SRC_ALPHA
+    je .srcAlpha
+    cmp eax, CGX_ONE_MINUS_SRC_ALPHA        ; ONE_MINUS_SRC_ALPHA
+    je .oneMinusSrcAlpha
+    cmp eax, CGX_DST_ALPHA                  ; DST_ALPHA
+    je .dstAlpha
+    cmp eax, CGX_ONE_MINUS_DST_ALPHA        ; ONE_MINUS_DST_ALPHA 
+    je .oneMinusDstAlpha
+    cmp eax, CGX_SRC_COLOR                  ; SRC_COLOR
+    je .srcColor
+    cmp eax, CGX_ONE_MINUS_SRC_COLOR        ; ONE_MINUS_SRC_COLOR
+    je .oneMinusSrcColor
+    cmp eax, CGX_DST_COLOR                  ; DST_COLOR
+    je .dstColor
+    cmp eax, CGX_ONE_MINUS_DST_COLOR        ; ONE_MINUS_DST_COLOR
+    je .oneMinusDstColor
+    jmp .zero        
+
+.zero:
+    xor eax, eax
+    ret
+.one:
+    mov eax, 256
+    ret
+.srcAlpha:
+    mov eax, [rbp - 24]
+    shr eax, 24
+    and eax, 0xFF
+    ret
+.oneMinusSrcAlpha:
+    mov eax, [rbp - 24]
+    shr eax, 24
+    and eax, 0xFF
+    neg eax
+.dstAlpha:
+    mov eax, [rbp - 28]
+    shr eax, 24
+    and eax, 0xFF
+    ret
+.oneMinusDstAlpha:
+    mov eax, [rbp - 28]
+    shr eax, 24
+    and eax, 0xFF
+    neg eax
+    add eax, 256
+    ret
+.srcColor:
+    ; Use src.r as the factor (approx. for grayscale)
+    mov eax, [rbp - 24]
+    shr eax, 16
+    and eax, 0xFF
+    ret
+.oneMinusSrcColor:
+    mov eax, [rbp - 24]
+    shr eax, 16
+    and eax, 0xFF
+    neg eax
+    add eax, 256
+    ret
+.dstColor:
+    mov eax, [rbp - 28]
+    shr eax, 16
+    and eax, 0xFF
+    ret
+.oneMinusDstColor:
+    mov eax, [rbp - 28]
+    shr eax, 16
+    and eax, 0xFF
+    neg eax
+    add eax, 256
     ret
 
 ; --------------------------------------------
