@@ -189,7 +189,7 @@ main:
     mov r8d, CGX_FLOAT
     xor r9d, r9d
     mov qword [rsp + 32], 28
-    mov qword [rsp + 40], 0
+    mov qword [rsp + 40], 12
     call CGXVertexAttribPointer
 
     mov rcx, 0
