@@ -58,6 +58,11 @@ _cgxCoreMatrixInit:
     lea rdi, [rel _cgxCoreState + CGXState.projStack]
     call _writeIdentity
 
+    ; Culling defaults
+    mov dword [rel _cgxCoreState + CGXState.cullFaceEnabled], 0
+    mov dword [rel _cgxCoreState + CGXState.cullMode], CGX_BACK
+    mov dword [rel _cgxCoreState + CGXState.frontFace], CGX_CCW
+
     mov eax, 1
     add rsp, 40
     pop rbx

@@ -35,6 +35,9 @@ struc CGXState
     .padM                   resd 1
     .mvStack                resb 64 * 32
     .projStack              resb 64 * 32
+    .cullFaceEnabled        resd 1
+    .cullMode               resd 1
+    .frontFace              resd 1
 endstruc
 
 ; --- Buffer struct ---

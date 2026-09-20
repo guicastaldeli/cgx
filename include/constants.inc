@@ -104,3 +104,7 @@ CGX_FRONT_AND_BACK      equ 2
 CGX_MODELVIEW           equ 0
 CGX_PROJECTION          equ 1
 CGX_TEXTURE             equ 2
+
+; --- Winding orders ---
+CGX_CW                  equ 0
+CGX_CCW                 equ 1

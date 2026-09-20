@@ -69,3 +69,7 @@ extern CGXRotate
 extern CGXScale
 extern CGXPerspective
 extern CGXOrtho
+
+; --- Culling ---
+extern CGXCullFace
+extern CGXFrontFace

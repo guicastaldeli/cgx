@@ -33,6 +33,8 @@ extern CGXLoadIdentity
 extern CGXTranslate
 extern CGXRotate
 extern CGXPerspective
+extern CGXCullFace
+extern CGXFrontFace
 extern MessageBoxA
 
 section .data
@@ -58,18 +60,18 @@ section .data
 
     ; --- Indices: 12 triangles (36 indices) ---
     indices:
-        ; back face (z = -0.5):  0, 1, 2, 3
-        dd 0, 1, 2,   2, 3, 0
-        ; front face (z = +0.5): 4, 5, 6, 7
+        ; back face (-Z)
+        dd 1, 0, 3,   3, 2, 1
+        ; front face (+Z)
         dd 4, 5, 6,   6, 7, 4
-        ; left face (x = -0.5):  0, 3, 7, 4
-        dd 0, 3, 7,   7, 4, 0
-        ; right face (x = +0.5): 1, 5, 6, 2
-        dd 1, 5, 6,   6, 2, 1
-        ; top face (y = +0.5):   3, 2, 6, 7
-        dd 3, 2, 6,   6, 7, 3
-        ; bottom face (y = -0.5): 0, 4, 5, 1
-        dd 0, 4, 5,   5, 1, 0
+        ; left face (-X)
+        dd 0, 4, 7,   7, 3, 0
+        ; right face (+X)
+        dd 5, 1, 2,   2, 6, 5
+        ; top face (+Y)
+        dd 3, 7, 6,   6, 2, 3
+        ; bottom face (-Y)
+        dd 0, 1, 5,   5, 4, 0
     indices_size equ 36 * 4
 
     ; Perspective params
@@ -122,6 +124,18 @@ main:
     ; Enable depth test
     mov rcx, CGX_DEPTH_TEST
     call CGXEnable
+
+    ; Enable backface culling
+    mov rcx, CGX_CULL_FACE
+    call CGXEnable
+
+    ; Cull back faces
+    mov rcx, CGX_BACK
+    call CGXCullFace
+
+    ; CCW winding = front
+    mov rcx, CGX_CW
+    call CGXFrontFace
 
     ; --- Create buffers ---
     ; VBO

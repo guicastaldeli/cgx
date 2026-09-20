@@ -14,6 +14,8 @@ extern CGXState
 global CGXEnable
 global CGXDisable
 global CGXDepthFunc
+global CGXCullFace
+global CGXFrontFace 
 
 section .text
 
@@ -22,14 +24,20 @@ section .text
 ; Input: rcx = cap (CGX_DEPTH_TEST, CGX_CULL_FACE, ...)
 CGXEnable:
     cmp ecx, CGX_DEPTH_TEST
-    jne .tryCull
+    je .depth
+    cmp ecx, CGX_CULL_FACE
+    je .cull
+    xor eax, eax
+    ret
+
+.depth:
     mov byte [rel _cgxCoreState + CGXState.depthTestEnabled], 1
     mov eax, 1
     ret
 
-.tryCull:
-    ; for CGX_CULL_FACE
-    xor eax, eax
+.cull:
+    mov dword [rel _cgxCoreState + CGXState.cullFaceEnabled], 1
+    mov eax, 1
     ret
 
 ; --------------------------------------------
@@ -38,14 +46,20 @@ CGXEnable:
 ; --------------------------------------------
 CGXDisable:
     cmp ecx, CGX_DEPTH_TEST
-    jne .tryCull
-    mov byte [rel _cgxCoreState + CGXState.depthTestEnabled], 0
+    je .depth
+    cmp ecx, CGX_CULL_FACE
+    je .cull
+    xor eax, eax
+    ret
+
+.depth:
+    mov dword [rel _cgxCoreState + CGXState.depthTestEnabled], 0
     mov eax, 1
     ret
 
-.tryCull:
-    ; for CGX_CULL_FACE
-    xor eax, eax
+.cull:
+    mov dword [rel _cgxCoreState + CGXState.cullFaceEnabled], 0
+    mov eax, 1
     ret
 
 ; --------------------------------------------
@@ -54,5 +68,23 @@ CGXDisable:
 ; --------------------------------------------
 CGXDepthFunc:
     mov [rel _cgxCoreState + CGXState.depthFunc], ecx
+    mov eax, 1
+    ret
+
+; --------------------------------------------
+; CGXCullFace
+; Input: rcx = mode (CGX_FRONT / CGX_BACK / CGX_FRONT_AND_BACK)
+; --------------------------------------------
+CGXCullFace:
+    mov [rel _cgxCoreState + CGXState.cullMode], ecx
+    mov eax, 1
+    ret
+
+; --------------------------------------------
+; CGXFrontFace
+; Input: rcx = winding (CGX_CW or CGX_CCW)
+; --------------------------------------------
+CGXFrontFace:
+    mov [rel _cgxCoreState + CGXState.frontFace], ecx
     mov eax, 1
     ret

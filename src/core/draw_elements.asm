@@ -254,6 +254,66 @@ _cgxCoreRasterTriangle:
 
     mov r14, rdi
 
+    ; --- Backface culling test ---
+    cmp dword [rel _cgxCoreState + CGXState.cullFaceEnabled], 0
+    je .noCull
+
+    ; Compute signed area: area (Bx-Ax)*(Cy-Ay) - (By-Ay)*(Cx-Ax)
+    mov eax, [r14 + RasterVertex.px + RasterVertex_size]            ; Bx
+    sub eax, [r14 + RasterVertex.px + 0]                            ; Bx - Ax
+    mov ecx, [r14 + RasterVertex.py + RasterVertex_size * 2]        ; Cy
+    sub ecx, [r14 + RasterVertex.py + 0]                            ; Cy - Ay
+    imul eax, ecx
+
+    mov ebx, [r14 + RasterVertex.py + RasterVertex_size]            ; By
+    sub ebx, [r14 + RasterVertex.py + 0]                            ; By - Ay
+    mov edx, [r14 + RasterVertex.px + RasterVertex_size * 2]        ; Cx
+    sub edx, [r14 + RasterVertex.px + 0]                            ; Cx - Ax
+    imul ebx, edx                                                   ; (By-Ay)*(Cx-Ax)
+
+    sub eax, ebx                                                    ; eax = sign area
+
+    ; Determine isFront
+    mov ecx, [rel _cgxCoreState + CGXState.frontFace]
+    cmp ecx, CGX_CCW
+    je .ccwFront
+
+    ; CW is front: isFront = (area < 0)
+    test eax, eax
+    js .isFront
+    jmp .isBack
+
+.ccwFront:
+    ; CCW is front: isFront (area > 0)
+    test eax, eax
+    jg .isFront
+    jmp .isBack
+.isFront:
+    mov ecx, [rel _cgxCoreState + CGXState.cullMode]
+    cmp ecx, CGX_FRONT
+    je .cull
+    cmp ecx, CGX_FRONT_AND_BACK
+    je .cull
+    jmp .noCull
+.isBack:
+    mov ecx, [rel _cgxCoreState + CGXState.cullMode]
+    cmp ecx, CGX_BACK
+    je .cull
+    cmp ecx, CGX_FRONT_AND_BACK
+    je .cull
+    jmp .noCull
+
+.cull:
+    ; Skip this triangle
+    add rsp, 96
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    pop rbp
+    ret
+.noCull:
     ; Bounding box
     mov eax, [r14 + RasterVertex.px + 0]
     mov r8d, [r14 + RasterVertex.px + RasterVertex_size]
