@@ -30,9 +30,7 @@ struc RasterVertex
 endstruc
 
 section .bss
-    align 16 
     rasterVerts     resb RasterVertex_size * 3
-    align 16
     mvpCache        resb 64
 
 section .text

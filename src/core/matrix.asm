@@ -289,33 +289,33 @@ _matrixMultiply:
     ; Load b's column j into xmm4 (4 floats: b[0..3][j])
     mov rsi, [rbp - 24]
     add rsi, rax
-    movaps xmm4, [rsi]          ; b[0][j], b[1][j], b[2][j], b[3][j]
+    movups xmm4, [rsi]          ; b[0][j], b[1][j], b[2][j], b[3][j]
 
     ; Broadcast each component into xmm5..xmm8
     ; xmm5 = (b0j, b0j, b0j, b0j)
-    movaps xmm5, xmm4
+    movups xmm5, xmm4
     shufps xmm5, xmm5, 0x00
     ; xmm6 = (b1j, b1j, b1j, b1j)
-    movaps xmm6, xmm4
+    movups xmm6, xmm4
     shufps xmm6, xmm6, 0x55
     ; xmm7 = (b2j, b2j, b2j, b2j)
-    movaps xmm7, xmm4
+    movups xmm7, xmm4
     shufps xmm7, xmm7, 0xAA
     ; xmm8 = (b3j, b3j, b3j, b3j)
-    movaps xmm8, xmm4
+    movups xmm8, xmm4
     shufps xmm8, xmm8, 0xFF
 
     ; Compute dst_col = a_col0 * b0j + a_col1 * b1j + a_col2 * b2j + a_col3 * b3j
     mov rsi, [rbp - 16]         ; a
-    movaps xmm0, [rsi + 0]      ; a_col0
+    movups xmm0, [rsi + 0]      ; a_col0
     mulps xmm0, xmm5
-    movaps xmm1, [rsi + 16]     ; a_col1
+    movups xmm1, [rsi + 16]     ; a_col1
     mulps xmm1, xmm6
     addps xmm0, xmm1
-    movaps xmm1, [rsi + 32]     ; a_col2
+    movups xmm1, [rsi + 32]     ; a_col2
     mulps xmm1, xmm7
     addps xmm0, xmm1
-    movaps xmm1, [rsi + 48]     ; a_col3
+    movups xmm1, [rsi + 48]     ; a_col3
     mulps xmm1, xmm8
     addps xmm0, xmm1
 
@@ -324,7 +324,7 @@ _matrixMultiply:
     mov eax, r8d
     shl eax, 4
     add rdi, rax
-    movaps [rdi], xmm0
+    movups [rdi], xmm0
 
     inc r8d
     jmp .colLoop
@@ -343,38 +343,38 @@ _matrixMultiply:
 _matrixMultiplyVec4:
     ; Load vector components into xmm4 (broadcast pattern)
     ; col0 = (x, x, x, x)
-    movaps xmm4, xmm0
+    movups xmm4, xmm0
     shufps xmm4, xmm4, 0x00
     ; col1 = (y, y, y, y)
-    movaps xmm5, xmm1
+    movups xmm5, xmm1
     shufps xmm5, xmm5, 0x00
     ; col2 = (z, z, z, z)
-    movaps xmm6, xmm2
+    movups xmm6, xmm2
     shufps xmm6, xmm6, 0x00
     ; col3 = (w, w, w, w)
-    movaps xmm7, xmm3
+    movups xmm7, xmm3
     shufps xmm7, xmm7, 0x00
 
     ; result = col0 * M[0] + col1 * M[1] + col2 * M[2] + col3 * M[3]
-    movaps xmm0, [rdi + 0]
+    movups xmm0, [rdi + 0]
     mulps xmm0, xmm4
-    movaps xmm1, [rdi + 16]
+    movups xmm1, [rdi + 16]
     mulps xmm1, xmm5
     addps xmm0, xmm1
-    movaps xmm1, [rdi + 32]
+    movups xmm1, [rdi + 32]
     mulps xmm1, xmm6
     addps xmm0, xmm1
-    movaps xmm1, [rdi + 48]
+    movups xmm1, [rdi + 48]
     mulps xmm1, xmm7
     addps xmm0, xmm1
 
     ; xmm0 now holds (x', y', z', w')
     ; Split into xmm0..xmm3
-    movaps xmm1, xmm0
+    movups xmm1, xmm0
     shufps xmm1, xmm1, 0x55         ; y'
-    movaps xmm2, xmm0
+    movups xmm2, xmm0
     shufps xmm2, xmm2, 0xAA         ; z'
-    movaps xmm3, xmm0
+    movups xmm3, xmm0
     shufps xmm3, xmm3, 0xFF         ; w'
     shufps xmm0, xmm0, 0x00         ; x'
 
@@ -782,8 +782,8 @@ _cgxCoreOrtho:
     sub rsp, 128
 
     ; Load near, far from stack
-    movss xmm4, [rbp + 48]      ; n
-    movss xmm5, [rbp + 56]      ; f
+    movss xmm4, [rbp + 40]      ; n
+    movss xmm5, [rbp + 48]      ; f
 
     ; Zero temp at rbp-128
     lea rdi, [rbp - 128]

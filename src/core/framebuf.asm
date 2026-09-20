@@ -58,12 +58,12 @@ _cgxCoreInitFramebuffer:
     mov eax, r12d
     imul eax, ebx
     shl eax, 2
-    mov r12, rax ; size
     mov [rel _cgxCoreState + CGXState.fbSize], rax
+    push rax
 
     ; VirtualAlloc(NULL, size, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE)
     xor rcx, rcx
-    mov rdx, r12
+    pop rdx
     mov r8d, MEM_COMMIT | MEM_RESERVE
     mov r9d, PAGE_READWRITE
     call VirtualAlloc
