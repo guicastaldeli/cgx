@@ -63,7 +63,7 @@ _cgxCoreSetColor:
 _cgxCoreDrawPixel:
     push rbp
     mov rbp, rsp
-    sub rsp, 32
+    sub rsp, 64
     
     ; Bounds check
     cmp ecx, 0
@@ -127,52 +127,65 @@ _cgxCoreDrawPixel:
     je .writeDirect
 
     ; --- Blending path ---
-    ; Extract src channels (0-255)
-    ; Memory order (little-endian): byte0=B, byte1=G, byte2=R, byte3=A
-    ; eax: bits 0-7 = B, 8-15 = G, 16-23 = R, 24-31 = A
+    ; eax = packed src (AARRGGBB)
+    ; r8  = framebuffer pixel pointer
+    ; [r8] = packed dst
 
     mov r9d, [r8]               ; dst color
 
-    ; Compute src factor and dst factor for each channel...
-    ; Save src and dst for factor lookups
+    ; Save src/dst for the alpha reconstruction at the end
     mov [rbp - 24], eax         ; src (AARRGGBB)
     mov [rbp - 28], r9d         ; dst
 
-    ; Color channels
-    ; Red channel
+    ; --- Red channel ---
     mov edx, eax
     shr edx, 16
     and edx, 0xFF               ; src.r
     mov ecx, r9d
     shr ecx, 16
     and ecx, 0xFF               ; dst.r
+    push r9                     ; packed dst
+    push rax                    ; packed src
     call _blendChannel
-    shl eax, 16
-    mov r11d, eax               ; save blended red
+    add  rsp, 16
+    shl  eax, 16
+    mov  [rbp - 32], eax        ; save blended red
 
-    ; Green channel
-    mov edx, [rbp - 24]
+    ; --- Green channel ---
+    mov eax, [rbp - 24]         ; reload packed src
+    mov r9d, [rbp - 28]         ; reload packed dst
+    mov edx, eax
     shr edx, 8
     and edx, 0xFF               ; src.g
     mov ecx, r9d
     shr ecx, 8
     and ecx, 0xFF               ; dst.g
+    push r9
+    push rax
     call _blendChannel
-    shl eax, 8
-    or r11d, eax
+    add  rsp, 16
+    shl  eax, 8
+    or   eax, [rbp - 32]
+    mov  [rbp - 32], eax
 
-    ; Blue channel
-    mov edx, [rbp - 24]
+    ; --- Blue channel ---
+    mov eax, [rbp - 24]         ; reload packed src
+    mov r9d, [rbp - 28]         ; reload packed dst
+    mov edx, eax
     and edx, 0xFF               ; src.b
     mov ecx, r9d
     and ecx, 0xFF               ; dst.b
+    push r9
+    push rax
     call _blendChannel
-    or r11d, eax
+    add  rsp, 16
+    or   eax, [rbp - 32]
+    mov  r11d, eax
 
-    ; Alpha
+    ; --- Alpha (keep src alpha) ---
     mov eax, [rbp - 24]
     and eax, 0xFF000000
-    or r11d, eax
+    or  r11d, eax
 
     mov [r8], r11d
     jmp .out
@@ -187,46 +200,50 @@ _cgxCoreDrawPixel:
 
 ; --------------------------------------------
 ; _blendChannel
-; Input: edx = src value (0-255), ecx = dst value (0-255)
+; Input: edx = src channel value (0-255)
+;       ecx = dst channel value (0-255)
+;       r8d = packed src color (AARRGGBB)
+;       r9d = packed dst color (AARRGGBB)
 ; Output: eax = blended value (0-255)
-; Reads blendSrc, blendDst, drawAlpha from state
-; Clobbers: eax, ebx, edi, r10, r11, xmm0-2
+; Reads blendSrc, blendDst from state
+; Clobbers: eax, ebx, edi, xmm0-2
 ; --------------------------------------------
 _blendChannel:
-    ; srcFactor and dstFactor need to be computed for this channel.
-    ; for factors ZERO, ONE, SRC_ALPHA, ONE_MINUS_SRC_ALPHA,
-    ; SRC_COLOR, ONE_MINUS_SRC_COLOR, DST_ALPHA, etc
+    push rbp
+    mov rbp, rsp
+    sub rsp, 48
 
-    ; --- Compute srcFactor ---
+    mov [rbp - 8], edx          ; src channel value
+    mov [rbp - 12], ecx         ; dst channel value
+    mov [rbp - 24], r8d         ; packed src
+    mov [rbp - 28], r9d         ; packed dst
+
+    ; Compute srcFactor
     mov eax, [rel _cgxCoreState + CGXState.blendSrc]
-    call _computeFactor             ; returns eax = factor * 256
-    mov edi, eax                    ; srcFactor * 256
-
-    ; --- Compute dstFactor ---
-    mov eax, [rel _cgxCoreState + CGXState.blendDst]
-    push rdx
-    push rcx
-    mov edx, [rbp - 24]             ; src
-    mov ecx, [rbp - 28]             ; dst
     call _computeFactor
-    pop rcx
-    pop rdx
+    mov [rbp - 16], eax         ; save srcFactor to stack
 
-    ; --- Blend: out (src * srcFactor + dst * dstFactor) / 256 ---
-    mov ebx, edx
-    imul ebx, edi                   ; src * srcFactor
-    mov r10d, eax
-    imul r10d, ecx                  ; dst * dstFactor
-    add ebx, r10d
-    shr ebx, 8                      ; divide by 256, back to 0-255 range
+    ; Compute dstFactor
+    mov eax, [rel _cgxCoreState + CGXState.blendDst]
+    call _computeFactor
+    mov r10d, eax               ; dstFactor * 256
 
-    ; Clamp
-    cmp ebx, 255
+    ; Blend: (src * srcFactor + dst * dstFactor) >> 8
+    mov eax, [rbp - 8]          ; src channel
+    imul eax, [rbp - 16]        ; src * srcFactor
+    mov ebx, [rbp - 12]         ; dst channel
+    imul ebx, r10d              ; dst * dstFactor
+    add eax, ebx
+    shr eax, 8                  ; back to 0-255 range
+
+    ; Clamp to 255
+    cmp eax, 255
     jbe .ok
-    mov ebx, 255
+    mov eax, 255
 
 .ok:
-    mov eax, ebx
+    add rsp, 48
+    pop rbp
     ret
 
 ; --------------------------------------------
@@ -268,11 +285,17 @@ _computeFactor:
     mov eax, [rbp - 24]
     shr eax, 24
     and eax, 0xFF
+    mov ecx, eax
+    shr ecx, 7
+    add eax, ecx
     ret
 .oneMinusSrcAlpha:
     mov eax, [rbp - 24]
     shr eax, 24
     and eax, 0xFF
+    mov ecx, eax
+    shr ecx, 7
+    add eax, ecx
     neg eax
     add eax, 256
     ret
@@ -280,24 +303,35 @@ _computeFactor:
     mov eax, [rbp - 28]
     shr eax, 24
     and eax, 0xFF
+    mov ecx, eax
+    shr ecx, 7
+    add eax, ecx
     ret
 .oneMinusDstAlpha:
     mov eax, [rbp - 28]
     shr eax, 24
     and eax, 0xFF
+    mov ecx, eax
+    shr ecx, 7
+    add eax, ecx
     neg eax
     add eax, 256
     ret
 .srcColor:
-    ; Use src.r as the factor (approx. for grayscale)
     mov eax, [rbp - 24]
     shr eax, 16
     and eax, 0xFF
+    mov ecx, eax
+    shr ecx, 7
+    add eax, ecx
     ret
 .oneMinusSrcColor:
     mov eax, [rbp - 24]
     shr eax, 16
     and eax, 0xFF
+    mov ecx, eax
+    shr ecx, 7
+    add eax, ecx
     neg eax
     add eax, 256
     ret
@@ -305,11 +339,17 @@ _computeFactor:
     mov eax, [rbp - 28]
     shr eax, 16
     and eax, 0xFF
+    mov ecx, eax
+    shr ecx, 7
+    add eax, ecx
     ret
 .oneMinusDstColor:
     mov eax, [rbp - 28]
     shr eax, 16
     and eax, 0xFF
+    mov ecx, eax
+    shr ecx, 7
+    add eax, ecx
     neg eax
     add eax, 256
     ret

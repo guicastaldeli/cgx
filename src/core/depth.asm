@@ -162,8 +162,7 @@ _cgxCoreDepthTest:
 
     ; Compute index = y * width + x
     mov eax, edx
-    mov r8d, [rel _cgxCoreState + CGXState.width]
-    imul eax, r8d
+    imul eax, [rel _cgxCoreState + CGXState.width]
     add eax, ecx
 
     ; ptr = depthBuffer + index * 4
