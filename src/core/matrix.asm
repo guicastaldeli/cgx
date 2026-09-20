@@ -593,29 +593,11 @@ _cgxCoreRotate:
     pop rdi
 
     ; R[0][0] = c + nx*nx*(1-c)
-    movaps xmm6, xmm0               ; nx
-    mulss xmm6, xmm0                ; nx*nx
-    mulss xmm6, xmm5                ; * (1-c)
-    addss xmm6, xmm4                ; + c
+    movaps xmm6, xmm0
+    mulss xmm6, xmm0
+    mulss xmm6, xmm5
+    addss xmm6, xmm4
     movss [rdi + 0], xmm6
-
-    ; R[0][1] = nx*ny*(1-c) - nz*s
-    movaps xmm6, xmm0
-    mulss xmm6, xmm1
-    mulss xmm6, xmm5
-    movaps xmm7, xmm2
-    mulss xmm7, xmm3
-    subss xmm6, xmm7
-    movss [rdi + 4], xmm6
-
-    ; R[0][2] = nx*nz*(1-c) + ny*s
-    movaps xmm6, xmm0
-    mulss xmm6, xmm2
-    mulss xmm6, xmm5
-    movaps xmm7, xmm1
-    mulss xmm7, xmm3
-    addss xmm6, xmm7
-    movss [rdi + 8], xmm6
 
     ; R[1][0] = ny*nx*(1-c) + nz*s
     movaps xmm6, xmm1
@@ -624,6 +606,24 @@ _cgxCoreRotate:
     movaps xmm7, xmm2
     mulss xmm7, xmm3
     addss xmm6, xmm7
+    movss [rdi + 4], xmm6
+
+    ; R[2][0] = nz*nx*(1-c) - ny*s
+    movaps xmm6, xmm2
+    mulss xmm6, xmm0
+    mulss xmm6, xmm5
+    movaps xmm7, xmm1
+    mulss xmm7, xmm3
+    subss xmm6, xmm7
+    movss [rdi + 8], xmm6
+
+    ; R[0][1] = nx*xy*(1-c) - nz*s
+    movaps xmm6, xmm0
+    mulss xmm6, xmm1
+    mulss xmm6, xmm5
+    movaps xmm7, xmm2
+    mulss xmm7, xmm3
+    subss xmm6, xmm7
     movss [rdi + 16], xmm6
 
     ; R[1][1] = c + ny*ny*(1-c)
@@ -633,24 +633,6 @@ _cgxCoreRotate:
     addss xmm6, xmm4
     movss [rdi + 20], xmm6
 
-    ; R[1][2] = ny*nz*(1-c) - nx*s
-    movaps xmm6, xmm1
-    mulss xmm6, xmm2
-    mulss xmm6, xmm5
-    movaps xmm7, xmm0
-    mulss xmm7, xmm3
-    subss xmm6, xmm7
-    movss [rdi + 24], xmm6
-
-    ; R[2][0] = nz*nx*(1-c) - ny*s
-    movaps xmm6, xmm2
-    mulss xmm6, xmm0
-    mulss xmm6, xmm5
-    movaps xmm7, xmm1
-    mulss xmm7, xmm3
-    subss xmm6, xmm7
-    movss [rdi + 32], xmm6
-
     ; R[2][1] = nz*ny*(1-c) + nx*s
     movaps xmm6, xmm2
     mulss xmm6, xmm1
@@ -658,6 +640,24 @@ _cgxCoreRotate:
     movaps xmm7, xmm0
     mulss xmm7, xmm3
     addss xmm6, xmm7
+    movss [rdi + 24], xmm6
+
+    ; R[0][2] = nx*nz*(1-c) + ny*s
+    movaps xmm6, xmm0
+    mulss xmm6, xmm2
+    mulss xmm6, xmm5
+    movaps xmm7, xmm1
+    mulss xmm7, xmm3
+    addss xmm6, xmm7
+    movss [rdi + 32], xmm6
+
+    ; R[1][2] = ny*nz*(1-c) - nx*s
+    movaps xmm6, xmm1
+    mulss xmm6, xmm2
+    mulss xmm6, xmm5
+    movaps xmm7, xmm0
+    mulss xmm7, xmm3
+    subss xmm6, xmm7
     movss [rdi + 36], xmm6
 
     ; R[2][2] = c + nz*nz*(1-c)
