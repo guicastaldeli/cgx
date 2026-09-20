@@ -627,12 +627,15 @@ _cgxCoreRasterTriangle:
     movss xmm4, [rbp - 120]
 
     ; Interpolate alpha
-    movss xmm5, [r14 + RasterVertex.a + 0]
+    mov eax, [r14 + RasterVertex.a + 0]
+    cvtsi2ss xmm5, eax
     mulss xmm5, xmm0
-    movss xmm6, [r14 + RasterVertex.a + RasterVertex_size]
+    mov eax, [r14 + RasterVertex.a + RasterVertex_size]
+    cvtsi2ss xmm6, eax
     mulss xmm6, xmm2
     addss xmm5, xmm6
-    movss xmm6, [r14 + RasterVertex.a + RasterVertex_size * 2]
+    mov eax, [r14 + RasterVertex.a + RasterVertex_size * 2]
+    cvtsi2ss xmm6, eax
     mulss xmm6, xmm4
     addss xmm5, xmm6
 
@@ -640,7 +643,7 @@ _cgxCoreRasterTriangle:
     mov eax, 0x3B808081
     movd xmm1, eax
     mulss xmm5, xmm1
-    
+
     movaps xmm0, xmm5
     call _cgxCoreSetAlpha
 

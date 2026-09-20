@@ -215,13 +215,17 @@ _blendChannel:
 
     mov [rbp - 8], edx          ; src channel value
     mov [rbp - 12], ecx         ; dst channel value
-    mov [rbp - 24], r8d         ; packed src
-    mov [rbp - 28], r9d         ; packed dst
+
+    ; Pull packed src/dst from callers stack
+    mov eax, [rbp + 16]
+    mov [rbp - 24], eax         ; packed src
+    mov eax, [rbp + 24]
+    mov [rbp - 28], eax         ; packet dst
 
     ; Compute srcFactor
     mov eax, [rel _cgxCoreState + CGXState.blendSrc]
     call _computeFactor
-    mov [rbp - 16], eax         ; save srcFactor to stack
+    mov [rbp - 16], eax         ; save srcFactor
 
     ; Compute dstFactor
     mov eax, [rel _cgxCoreState + CGXState.blendDst]
@@ -234,9 +238,8 @@ _blendChannel:
     mov ebx, [rbp - 12]         ; dst channel
     imul ebx, r10d              ; dst * dstFactor
     add eax, ebx
-    shr eax, 8                  ; back to 0-255 range
+    shr eax, 8
 
-    ; Clamp to 255
     cmp eax, 255
     jbe .ok
     mov eax, 255
