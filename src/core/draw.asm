@@ -112,8 +112,15 @@ _cgxCoreDrawPixel:
     mulss xmm0, xmm1
     cvttss2si edi, xmm0
     cmp edi, 0
-    jge .a1
+    jge .alphaSave
     xor edi, edi
+
+.alphaSave:
+    cmp edi, 255
+    jle .alphaClampDone
+    mov edi, 255
+.alphaClampDone:
+    mov [rbp - 40], edi
 
     ; --- Texture sampling ---
     cmp dword [rel _cgxCoreState + CGXState.texture2DEnabled], 0

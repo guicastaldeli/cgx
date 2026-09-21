@@ -657,6 +657,10 @@ _cgxCoreRasterTriangle:
     movaps xmm0, xmm5
     call _cgxCoreSetAlpha
 
+    movss xmm0, [rbp - 112]
+    movss xmm2, [rbp - 116]
+    movss xmm4, [rbp - 120]
+
     ; Interpolate U
     movss xmm5, [r14 + RasterVertex.u + 0]
     mulss xmm5, xmm0
@@ -664,7 +668,7 @@ _cgxCoreRasterTriangle:
     mulss xmm6, xmm2
     addss xmm5, xmm6
     movss xmm6, [r14 + RasterVertex.u + RasterVertex_size * 2]
-    mulss xmm5, xmm4
+    mulss xmm6, xmm4
     addss xmm5, xmm6
     movss [rbp - 124], xmm5
 

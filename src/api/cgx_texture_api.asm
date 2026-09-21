@@ -17,7 +17,7 @@ extern _cgxCoreActiveTexture
 
 global CGXGenTextures
 global CGXDeleteTextures
-global CHXBindTexture
+global CGXBindTexture
 global CGXTexImage2D
 global CGXTexParameteri
 global CGXTexEnvi
@@ -71,7 +71,7 @@ CGXTexImage2D:
 ; Input: rcx = target, rdx = pname, r8 = param
 ; Output: eax = 1 ok, 0 fail
 ; --------------------------------------------
-CGXTextureParameteri:
+CGXTexParameteri:
     jmp _cgxCoreTextureParameter
 
 ; --------------------------------------------
@@ -88,4 +88,4 @@ CGXTexEnvi:
 ; Output: eax = 1 ok, 0
 ; --------------------------------------------
 CGXActiveTexture:
-    jmp _cgxActiveTexture
+    jmp _cgxCoreActiveTexture

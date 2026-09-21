@@ -47,25 +47,25 @@ _cgxCoreTextureInit:
     ; Defaults
     mov dword [rel _cgxCoreState + CGXState.texPool], 0
     mov qword [rel _cgxCoreState + CGXState.texPool], 0
-    mod dword [rel _cgxCoreState + CGXState.texCapacity], 0
+    mov dword [rel _cgxCoreState + CGXState.texCapacity], 0
     mov dword [rel _cgxCoreState + CGXState.texCount], 0
     mov dword [rel _cgxCoreState + CGXState.nextTexId], 1
     mov dword [rel _cgxCoreState + CGXState.boundTexture], 0
     mov dword [rel _cgxCoreState + CGXState.activeTexUnit], CGX_TEXTURE0
     mov dword [rel _cgxCoreState + CGXState.texture2DEnabled], 0
-    mod dword [rel _cgxCoreState + CGXState.texEnvMode], CGX_MODULATE
+    mov dword [rel _cgxCoreState + CGXState.texEnvMode], CGX_MODULATE
 
     ; Initial pool
     xor rcx, rcx
     mov rdx, INITIAL_CAPACITY * Texture_size
-    mov r8d, MEM_CAPACITY | MEM_RESERVE
+    mov r8d, MEM_COMMIT | MEM_RESERVE
     mov r9d, PAGE_READWRITE
     call VirtualAlloc
     test rax, rax
     jz .fail
 
     mov [rel _cgxCoreState + CGXState.texPool], rax
-    mov dword [rle _cgxCoreState + CGXState.texCapacity], INITIAL_CAPACITY
+    mov dword [rel _cgxCoreState + CGXState.texCapacity], INITIAL_CAPACITY
 
     mov eax, 1
     jmp .done
@@ -164,15 +164,15 @@ _cgxCoreTextureGen:
     push r15
     sub rsp, 40
 
-    mov r12d                    ; n
-    mov r13                     ; out ptr
+    mov r12d, ecx                    ; n
+    mov r13, rdx                     ; out ptr
 
     test r12d, r12d
     jz .fail
     test r13, r13
     jz .fail
     
-    xor r14d, r14d              ; i
+    xor r14d, r14d                  ; i
 
 .genLoop:
     cmp r14d, r12d
@@ -180,7 +180,7 @@ _cgxCoreTextureGen:
 
     ; Find a free slot; grow if needed
     call _findFreeTexSlot
-    test rdi, rsi
+    test rdi, rdi
     jnz .haveSlot
 
     ; Try growing once
@@ -244,7 +244,7 @@ _findFreeTexSlot:
     push r12
 
     mov rbx, [rel _cgxCoreState + CGXState.texPool]
-    text rbx, rbx
+    test rbx, rbx
     jz .none
 
     mov r12d, [rel _cgxCoreState + CGXState.texCapacity]
@@ -274,7 +274,7 @@ _findFreeTexSlot:
     xor edi, edi
     pop r12
     pop rbx
-    rey
+    ret
 
 ; --------------------------------------------
 ; _cgxCoreTextureDelete
@@ -301,7 +301,7 @@ _cgxCoreTextureDelete:
     xor r14d, r14d
 
 .delLoop:
-    cmp r14, r12d
+    cmp r14d, r12d
     jge .success
 
     mov edx, [r13 + r14*4]      ; id
@@ -369,7 +369,7 @@ _findTexSlotById:
     jz .none
 
     mov rbx, [rel _cgxCoreState + CGXState.texPool]
-    text rbx, rbx
+    test rbx, rbx
     jz .none
 
     mov ecx, [rel _cgxCoreState + CGXState.texCapacity]
@@ -430,7 +430,7 @@ _cgxCoreTextureBind:
 _cgxCoreActiveTexture:
     cmp ecx, CGX_TEXTURE0
     jne .fail
-    mov [rel _cgxCoreState + CGXState.activeUnit], ecx
+    mov [rel _cgxCoreState + CGXState.activeTexUnit], ecx
     mov eax, 1
     ret
 
@@ -490,7 +490,7 @@ _cgxCoreTextureImage:
     ; Free old pixels if present
     mov rcx, [rbx + Texture.data]
     test rcx, rcx
-    jz .allowNew
+    jz .allocNew
 
     xor rdx, rdx
     mov r8d, MEM_RELEASE
@@ -558,7 +558,7 @@ _cgxCoreTextureParameter:
     mov r13d, r8d               ; param
 
     call _cgxCoreFindBoundTexture
-    test rdi rdi
+    test rdi, rdi
     jz .fail
     mov rbx, rdi
 
@@ -642,8 +642,8 @@ _cgxCoreFindBoundTexture:
     ret
 
 .none:
-    xor edi, rdi
-    pop rdi
+    xor edi, edi
+    pop rbx
     ret
 
 ; --------------------------------------------
@@ -677,20 +677,21 @@ _cgxCoreTextureSample:
     jz .fail
 
     ; Wrap U
+    ;   - Save V to [rbp - 48] first, because _applyWrapFloat
+    ;       clobbers xmm1 internally (if does cvtsi2ss xmm1, edx)
+    ;   - [rbp - 48] is inside the 40-byte local frame (rbp-40..rbp-72).
+    movss [rbp - 48], xmm1                  ; save V
     mov ecx, [rbx + Texture.wrapS]
-    mov edx, r12d                   ; dim
-    mov r14d, 0                     ; result
+    mov edx, r12d                           ; dim = width
     call _applyWrapFloat
-    mov r14d, eax                   ; wrapped U as int
+    mov r14d, eax                           ; texU
 
-    ; Warp V
+    ; Wrap V
+    movss xmm0, [rbp - 48]                  ; restore V
     mov ecx, [rbx + Texture.wrapT]
-    mov edx, r13d
-    movaps xmm2, xmm0
-    movaps xmm0, xmm1
+    mov edx, r13d                           ; dim = height
     call _applyWrapFloat
-    mov r13d, ax                    ; wrapped V as int
-    movaps xmm0, xmm2
+    mov r13d, eax                           ; texV
 
     ; --- Index ---
     mov eax, r13d
@@ -701,7 +702,7 @@ _cgxCoreTextureSample:
     ; --- Load texel ---
     mov rcx, [rbx + Texture.data]
     shl eax, 2
-    add rcx, eax
+    add rcx, rax
     mov eax, [rcx]
 
     jmp .done
@@ -723,7 +724,7 @@ _cgxCoreTextureSample:
 ; Input: xmm0 = coord (float), ecx = wrap mode, edx = dim
 ; Output: eax = integer texel coordinate, wrapped
 ; --------------------------------------------
-_applyWarpFloat:
+_applyWrapFloat:
     ; coord * dim
     cvtsi2ss xmm1, edx
     mulss xmm0, xmm1
@@ -751,7 +752,7 @@ _applyWarpFloat:
     mov ecx, edx
 
     test eax, eax
-    jnz .modPos
+    js .modPos
 
 .modNeg:
     ; add multiples of ecx until >= 0
