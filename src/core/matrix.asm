@@ -69,6 +69,14 @@ _cgxCoreMatrixInit:
     mov dword [rel _cgxCoreState + CGXState.blendDst], CGX_ZERO
     mov dword [rel _cgxCoreState + CGXState.drawAlpha], 0x3F800000      ; 1.0f alpha value
 
+    ; Texture defaults
+    mov dword [rel _cgxCoreState + CGXState.texture2DEnabled], 0
+    mov dword [rel _cgxCoreState + CGXState.texEnvMode], CGX_MODULATE
+    mov dword [rel _cgxCoreState + CGXState.boundTexture], 0
+    mov dword [rel _cgxCoreState + CGXState.activeTexUnit], CGX_TEXTURE0
+    mov dword [rel _cgxCoreState + CGXState.drawU], 0
+    mov dword [rel _cgxCoreState + CGXState.drawV], 0
+    
     mov eax, 1
     add rsp, 40
     pop rbx

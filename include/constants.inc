@@ -120,3 +120,42 @@ CGX_DST_COLOR                       equ 6
 CGX_ONE_MINUS_DST_COLOR             equ 7
 CGX_DST_ALPHA                       equ 8
 CGX_ONE_MINUS_DST_ALPHA             equ 9
+
+; --- Texture targets ---
+CGX_TEXTURE_2D                      equ 0x0DE1
+
+; --- Texture units ---
+CGX_TEXTURE0                        equ 0x84C0
+
+; --- Pixel formats ---
+CGX_RGBA                            equ 0x1908
+CGX_RGB                             equ 0x1907
+
+; --- Pixel types ---
+CGX_UNSIGNED_BYTE                   equ 0x1401
+
+; --- Texture parameters ---
+CGX_TEXTURE_MIN_FILTER              equ 0x2801
+CGX_TEXTURE_MAG_FILTER              equ 0x2800
+CGX_TEXTURE_WRAP_S                  equ 0x2802
+CGX_TEXTURE_WRAP_T                  equ 0x2803
+
+; --- Filter modes ---
+CGX_NEAREST                         equ 0x2600
+CGX_LINEAR                          equ 0x2601
+CGX_NEAREST_MIPMAP_NEAREST          equ 0x2700
+CGX_LINEAR_MIPMAP_NEAREST           equ 0x2701
+CGX_NEAREST_MIPMAP_LINEAR           equ 0x2702
+CGX_LINEAR_MIPMAP_LINEAR            equ 0x2703
+
+; --- Wrap modes ---
+CGX_REPEAT                          equ 0x2901
+CGX_CLAMP                           equ 0x2900
+CGX_CLAMP_TO_EDGE                   equ 0x812F
+
+; --- TexEnv ---
+CGX_TEXTURE_ENV                     equ 0x2300
+CGX_TEXTURE_ENV_MODE                equ 0x2200
+CGX_MODULATE                        equ 0x2100
+CGX_DECAL                           equ 0x2101
+CGX_REPLACE                         equ 0x1E01

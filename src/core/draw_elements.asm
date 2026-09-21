@@ -16,6 +16,7 @@ extern _cgxCoreSetColor
 extern _cgxCoreDrawPixel
 extern _cgxCoreSetDepth
 extern _cgxCoreSetAlpha
+extern _cgxCoreSetUV
 extern _matrixMultiply
 extern _matrixMultiplyVec4
 
@@ -29,6 +30,8 @@ struc RasterVertex
     .g          resd 1
     .b          resd 1
     .a          resd 1 
+    .u          resd 1
+    .v          resd 1
 endstruc
 
 section .bss
@@ -203,6 +206,13 @@ _cgxCoreFetchVertex:
     call _cgxCoreFloatToByte
     mov [r12 + RasterVertex.a], eax
 
+    ; Read texcoord (attr 2, size 2: UV)
+    mov ecx, [r14 + VAO.attribs + Attrib_size * 2 + Attrib.offset]
+    movss xmm0, [rbx + rcx + 0]
+    movss [r12 + RasterVertex.u], xmm0
+    movss xmm0, [rbx + rcx + 4]
+    movss [r12 + RasterVertex.v], xmm0
+
     add rsp, 32
     pop r12
     pop rbx
@@ -269,7 +279,7 @@ _cgxCoreRasterTriangle:
     push r13
     push r14
     push r15
-    sub rsp, 128
+    sub rsp, 160
 
     mov r14, rdi
 
@@ -324,7 +334,7 @@ _cgxCoreRasterTriangle:
 
 .cull:
     ; Skip this triangle
-    add rsp, 128
+    add rsp, 160
     pop r15
     pop r14
     pop r13
@@ -647,6 +657,33 @@ _cgxCoreRasterTriangle:
     movaps xmm0, xmm5
     call _cgxCoreSetAlpha
 
+    ; Interpolate U
+    movss xmm5, [r14 + RasterVertex.u + 0]
+    mulss xmm5, xmm0
+    movss xmm6, [r14 + RasterVertex.u + RasterVertex_size]
+    mulss xmm6, xmm2
+    addss xmm5, xmm6
+    movss xmm6, [r14 + RasterVertex.u + RasterVertex_size * 2]
+    mulss xmm5, xmm4
+    addss xmm5, xmm6
+    movss [rbp - 124], xmm5
+
+    ; Interpolate V
+    movss xmm5, [r14 + RasterVertex.v + 0]
+    mulss xmm5, xmm0
+    movss xmm6, [r14 + RasterVertex.v + RasterVertex_size]
+    mulss xmm6, xmm2
+    addss xmm5, xmm6
+    movss xmm6, [r14 + RasterVertex.v + RasterVertex_size * 2]
+    mulss xmm6, xmm4
+    addss xmm5, xmm6
+    movss [rbp - 128], xmm5
+
+    ; Pass to state
+    movss xmm0, [rbp - 124]
+    movss xmm1, [rbp - 128]
+    call _cgxCoreSetUV
+
     ; Draw
     mov ecx, r13d
     mov edx, r12d
@@ -662,7 +699,7 @@ _cgxCoreRasterTriangle:
     jmp .rowLoop
 
 .done:
-    add rsp, 128
+    add rsp, 160
     pop r15
     pop r14
     pop r13

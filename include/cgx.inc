@@ -76,3 +76,12 @@ extern CGXFrontFace
 
 ; --- Blending ---
 extern CGXBlendFunc
+
+; --- Textures ---
+extern CGXGenTextures
+extern CGXDeleteTextures
+extern CGXBindTexture
+extern CGXTexImage2D
+extern CGXTexParameteri
+extern CGXTexEnvi
+extern CGXActiveTexture

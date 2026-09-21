@@ -14,6 +14,7 @@ global _cgxCoreGetWidth
 global _cgxCoreGetHeight
 global _cgxCoreSetAlpha
 global _cgxCoreSetColorRGBA
+global _cgxCoreSetUV
 
 ; --- State instance ---
 section .bss
@@ -80,4 +81,13 @@ _cgxCoreSetAlpha:
 _cgxCoreSetColorRGBA:
     mov [rel _cgxCoreState + CGXState.drawColor], ecx
     movss [rel _cgxCoreState + CGXState.drawAlpha], xmm0
+    ret
+
+; --------------------------------------------
+; _cgxCoreSetUV
+; Input: xmm0 = u, xmm1 = v
+; --------------------------------------------
+_cgxCoreSetUV:
+    movss [rel _cgxCoreState + CGXState.drawU], xmm0
+    movss [rel _cgxCoreState + CGXState.drawV], xmm1
     ret

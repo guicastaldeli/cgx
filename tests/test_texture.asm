@@ -36,7 +36,7 @@ extern CGXActiveTexture
 extern MessageBoxA
 
 section .data
-    title dd "CGX Test - Texture", 0
+    title db "CGX Test - Texture", 0
 
     cR dd 0.05
     cG dd 0.05
@@ -98,7 +98,7 @@ buildCheckerboard:
     mov ecx, r12d
     shr ecx, 3
     add eax, ecx
-    mov eax, 1
+    test eax, 1
     jz .colorB
 
     ; Black: 0xAARRGGBB = 0x00000000
@@ -153,7 +153,7 @@ main:
 
     ; Generate a texture id
     mov rcx, 1
-    lea rcx, [rel texId]
+    lea rdx, [rel texId]
     call CGXGenTextures
 
     ; Bind
@@ -171,8 +171,8 @@ main:
     mov r9d, TEX_WIDTH                                  ; width
     mov qword [rsp + 32], TEX_HEIGHT
     mov qword [rsp + 40], 0
-    mov qword [rsp + 48], CGX_RGBA                      ; border
-    mov qword [rsp + 56], CGX_UNSIGNED_BYTE             ; format
+    mov qword [rsp + 48], CGX_RGBA                      ; format
+    mov qword [rsp + 56], CGX_UNSIGNED_BYTE             ; border
     lea rax, [rel textureData]
     mov qword [rsp + 64], rax
     call CGXTexImage2D

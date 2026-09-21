@@ -13,6 +13,7 @@ extern _cgxCoreGetFramebuffer
 extern _cgxCoreGetWidth
 extern _cgxCoreGetHeight
 extern _cgxCoreDepthTest
+extern _cgxCoreTextureSample
 
 global _cgxCoreRgbToBgra
 global _cgxCoreSetColor
@@ -113,6 +114,133 @@ _cgxCoreDrawPixel:
     cmp edi, 0
     jge .a1
     xor edi, edi
+
+    ; --- Texture sampling ---
+    cmp dword [rel _cgxCoreState + CGXState.texture2DEnabled], 0
+    je .noTex
+
+    ; Load U, V from state
+    movss xmm0, [rel _cgxCoreState + CGXState.drawU]
+    movss xmm1, [rel _cgxCoreState + CGXState.drawV]
+    call _cgxCoreTextureSample
+
+    ; if no texture bound, eax = 0
+    test eax, eax
+    jz .noTex
+
+    mov ebx, eax
+
+    ; Check env mode
+    mov ecx, [rel _cgxCoreState + CGXState.texEnvMode]
+    cmp ecx, CGX_REPLACE
+    je .texReplace
+    cmp ecx, CGX_DECAL
+    je .texDecal
+
+    ; MODULATE: src * texel / 255 per channel
+    ; (src in eax, texel in ebx, both AARRGGBB, memory RGBA)
+    ; Get components
+    mov ecx, eax
+    shr ecx, 24
+    and ecx, 0xFF               ; src.a
+
+    mov edx, eax
+    shr edx, 16
+    and edx, 0xFF               ; src.r
+    mov esi, ebx
+    shr esi, 16
+    and esi, 0xFF               ; tex.r
+    imul edx, esi
+    shr edx, 8
+    shl edx, 16
+
+    mov esi, eax
+    shr esi, 8
+    and esi, 0xFF               ; src.g
+    mov edi, ebx
+    shr edi, 8
+    and edi, 0xFF               ; tex.g
+    imul esi, edi
+    shr esi, 8
+    shl esi, 8
+    or edx, esi
+
+    mov esi, eax
+    and esi, 0xFF               ; src.b
+    mov edi, ebx
+    and edi, 0xFF               ; tex.b
+    imul esi, edi
+    shr esi, 8
+    or edx, esi
+
+    shl ecx, 24
+    or edx, ecx
+    mov eax, edx
+    jmp .texDone
+
+.texReplace:
+    mov ecx, eax
+    and ecx, 0xFF000000         ; src.a
+    mov eax, ebx
+    and eax, 0x00FFFFFF
+    or eax, ecx
+    jmp .texDone
+.texDecal:
+    ; DECAL: result = src(1-tex.a) + tex*tex.a
+    mov ecx, ebx
+    shr ecx, 24
+    and ecx, 0xff               ; tex.a
+
+    mov edx, 256
+    sub edx, ecx                ; 1 - tex.a in fixed point
+
+    ; R
+    mov esi, eax
+    shr esi, 16
+    and esi, 0xFF
+    imul esi, edx
+    mov edi, ebx
+    shr edi, 16
+    and edi, 0xFF
+    imul edi, ecx
+    add esi, edi
+    shr esi, 8
+    shl esi, 16
+    mov r10d, esi
+
+    ; G
+    mov esi, eax
+    shr esi, 8
+    and esi, 0xFF
+    imul esi, edx
+    mov edi, ebx
+    shr edi, 8
+    and edi, 0xFF
+    imul edi, ecx
+    add esi, edi
+    shr esi, 8
+    shl esi, 8
+    or r10d, esi
+
+    ; B
+    mov esi, eax
+    and esi, 0xFF
+    imul esi, edx
+    mov edi, ebx
+    and edi, 0xFF
+    imul edi, ecx
+    add esi, edi
+    shr esi, 8
+    or r10d, esi
+
+    ; Alpha = src.a
+    mov esi, eax
+    and esi, 0xFF000000
+    or r10d, esi
+    mov eax, r10d
+.texDone:
+.noTex:
+    mov edi, [rbp - 40]
 
 .a1:
     cmp edi, 255

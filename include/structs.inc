@@ -42,6 +42,16 @@ struc CGXState
     .blendSrc               resd 1
     .blendDst               resd 1
     .drawAlpha              resd 1
+    .texPool                resq 1
+    .texCount               resd 1
+    .texCapacity            resd 1
+    .nextTexId              resd 1
+    .boundTexture           resd 1
+    .activeTexUnit          resd 1
+    .texture2DEnabled       resd 1
+    .texEnvMode             resd 1
+    .drawU                  resd 1
+    .drawV                  resd 1
 endstruc
 
 ; --- Buffer struct ---
@@ -73,4 +83,19 @@ struc VAO
     .inUse                  resb 1
     .pad0                   resb 3
     .attribs                resb Attrib_size * 16
+endstruc
+
+; --- Texture struct ---
+struc Texture
+    .id                     resd 1
+    .width                  resd 1
+    .height                 resd 1
+    .dataSize               resd 1
+    .inUse                  resb 1
+    .pad0                   resb 3
+    .data                   resq 1
+    .minFilter              resd 1
+    .magFilter              resd 1
+    .wrapS                  resd 1
+    .wrapT                  resd 1
 endstruc
