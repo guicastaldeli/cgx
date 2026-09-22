@@ -21,6 +21,7 @@ global _cgxCoreBufferDelete
 global _cgxCoreBufferBind
 global _cgxCoreBufferGetData
 global _cgxCoreBufferGetSize
+global _cgxCoreBufferSubData
 
 MEM_COMMIT              equ 0x00001000
 MEM_RESERVE             equ 0x00002000
@@ -456,7 +457,7 @@ _cgxCoreBufferSubData:
     je .useVBO
     cmp r12d, CGX_BUFFER_INDEX
     je .useEBO
-    jmp .fial
+    jmp .fail
 
 .useVBO:
     mov ecx, [rel _cgxCoreState + CGXState.boundVBO]
@@ -465,7 +466,7 @@ _cgxCoreBufferSubData:
     mov ecx, [rel _cgxCoreState + CGXState.boundEBO]
 
 .haveId:
-    test ecxm ecx
+    test ecx, ecx
     jz .fail
 
     ; Find the buffer slot by id
@@ -495,7 +496,7 @@ _cgxCoreBufferSubData:
 .fail:
     xor eax, eax
 
-done:
+.done:
     add rsp, 32
     pop r15
     pop r14
@@ -530,7 +531,7 @@ _cgxCoreBufferFindById:
     jge .none
 
     mov edx, eax
-    mimul edx, Buffer_size
+    imul edx, Buffer_size
     mov rdi, rbx
     add rdi, rdx
 
@@ -550,7 +551,7 @@ _cgxCoreBufferFindById:
     ret
 
 .none:
-    xor edi, rdi
+    xor edi, edi
     pop r12
     pop rbx
     ret    

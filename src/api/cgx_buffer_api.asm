@@ -10,6 +10,7 @@ default rel
 extern _cgxCoreBufferCreate
 extern _cgxCoreBufferBind
 extern _cgxCoreBufferDelete
+extern _cgxCoreBufferSubData
 
 global CGXCreateVertexBuffer
 global CGXCreateIndexBuffer
