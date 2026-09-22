@@ -40,6 +40,7 @@ extern CGXCreateIndexBuffer
 extern CGXBindVertexBuffer
 extern CGXBindIndexBuffer
 extern CGXDeleteBuffer
+extern CGXBufferSubData
 
 ; --- VAOs ---
 extern CGXCreateVertexArray

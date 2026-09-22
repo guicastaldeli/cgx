@@ -133,12 +133,16 @@ _cgxCoreBufferCreate:
 
     mov r8, rax
 
-    ; Copt src -> dst
+    ; Copt src -> dst (only if a source pointer was given)
+    test r12, r12
+    jz .skipCopy
+    
     mov rdi, r8         ; dst
     mov rsi, r12        ; src
     mov rcx, r13        ; byte count
     rep movsb
 
+.skipCopy:
     ; Restore nextBufferId
     pop rdx
 
@@ -414,3 +418,139 @@ _cgxCoreBufferGetSize:
     pop rbx
     pop rbp
     ret
+
+; --------------------------------------------
+; _cgxCoreBufferSubData
+; Input: ecx = target (CGX_BUFFER_VERTEX / CGX_BUFFER_INDEX)
+;       rdx = offset (bytes),
+;       r8d = size (bytes),
+;       r9 = data ptr
+; Output: eax 1 ok, 0 fail
+; Writes into the currently bound buffer of the given target type.
+; --------------------------------------------
+_cgxCoreBufferSubData:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    sub rsp, 32
+
+    mov r12d, ecx       ; target
+    mov r13, rdx        ; offset
+    mov r14d, r8d       ; size
+    mov r15, r9         ; data
+
+    ; Validate
+    test r15, r15
+    jz .fail
+
+    ; size == 0 -> no-op success
+    test r14d, r14d
+    jz .success
+
+    ; Get the bound buffer id for this target
+    cmp r12d, CGX_BUFFER_VERTEX
+    je .useVBO
+    cmp r12d, CGX_BUFFER_INDEX
+    je .useEBO
+    jmp .fial
+
+.useVBO:
+    mov ecx, [rel _cgxCoreState + CGXState.boundVBO]
+    jmp .haveId
+.useEBO:
+    mov ecx, [rel _cgxCoreState + CGXState.boundEBO]
+
+.haveId:
+    test ecxm ecx
+    jz .fail
+
+    ; Find the buffer slot by id
+    call _cgxCoreBufferFindById
+    test rdi, rdi
+    jz .fail
+    
+    mov rbx, rdi
+
+    ; Check bounds: offset + size <= buffer.size
+    mov eax, r14d
+    add rax, r13            ; offset + size
+    cmp rax, [rbx + Buffer.size]
+    jg .fail
+
+    ; Copy: dst = buffer.data + offset, src = data, len = size
+    mov rdi, [rbx + Buffer.data]
+    add rdi, r13
+
+    mov rsi, r15
+    mov rcx, r14
+    rep movsb
+
+.success:
+    mov eax, 1
+    jmp .done
+.fail:
+    xor eax, eax
+
+done:
+    add rsp, 32
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    pop rbp
+    ret
+
+; --------------------------------------------
+; _cgxCoreBufferFindById
+; Input: ecx = buffer id
+; Output: rdi = slot ptr, or 0
+; --------------------------------------------
+_cgxCoreBufferFindById:
+    push rbx
+    push r12
+
+    mov r12d, ecx
+    test r12d, r12d
+    jz .none
+
+    mov rbx, [rel _cgxCoreState + CGXState.bufferPool]
+    test rbx, rbx
+    jz .none
+
+    mov ecx, [rel _cgxCoreState + CGXState.bufferCapacity]
+    xor eax, eax
+
+.scan:
+    cmp eax, ecx
+    jge .none
+
+    mov edx, eax
+    mimul edx, Buffer_size
+    mov rdi, rbx
+    add rdi, rdx
+
+    cmp byte [rdi + Buffer.inUse], 0
+    je .next
+
+    cmp dword [rdi + Buffer.id], r12d
+    je .found
+
+.next:
+    inc eax
+    jmp .scan
+
+.found:
+    pop r12
+    pop rbx
+    ret
+
+.none:
+    xor edi, rdi
+    pop r12
+    pop rbx
+    ret    

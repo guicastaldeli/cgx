@@ -16,6 +16,7 @@ global CGXCreateIndexBuffer
 global CGXBindVertexBuffer
 global CGXBindIndexBuffer
 global CGXDeleteBuffer
+global CGXBufferSubData
 
 section .text
 
@@ -60,3 +61,15 @@ CGXBindIndexBuffer:
 ; --------------------------------------------
 CGXDeleteBuffer:
     jmp _cgxCoreBufferDelete
+
+; --------------------------------------------
+; CGXBufferSubData
+; Input: rcx = target (CGX_BUFFER_VERTEX / CGX_BUFFER_INDEX),
+;       rdx = offset (bytes),
+;       r8d = size (bytes),
+;       r9 = data ptr
+; Output: eax = 1 ok, 0 fail
+; Writes into currently bound of the given target type.
+; --------------------------------------------
+CGXBufferSubData:
+    jmp _cgxCoreBufferSubData
