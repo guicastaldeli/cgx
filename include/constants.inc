@@ -159,3 +159,69 @@ CGX_TEXTURE_ENV_MODE                equ 0x2200
 CGX_MODULATE                        equ 0x2100
 CGX_DECAL                           equ 0x2101
 CGX_REPLACE                         equ 0x1E01
+
+; --- Shader types ---
+CGX_VERTEX_SHADER                   equ 0x8B31
+CGX_FRAGMENT_SHADER                 equ 0x8B30
+
+; --- Shader status queries ---
+CGX_COMPILE_STATUS                  equ 0x8B81
+CGX_LINK_STATUS                     equ 0x8B82
+CGX_INFO_LOG_LENGTH                 equ 0x8B84
+
+; --- GLSL type tags ---
+CGX_TYPE_FLOAT                      equ 0
+CGX_TYPE_VEC2                       equ 1
+CGX_TYPE_VEC3                       equ 2
+CGX_TYPE_VEC4                       equ 3
+CGX_TYPE_MAT4                       equ 4
+CGX_TYPE_INT                        equ 5
+CGX_TYPE_SAMPLER2D                  equ 6
+CGX_TYPE_VOID                       equ 7
+
+; --- GLSL qualifiers (internal) ---
+CGX_QUAL_NONE                       equ 0
+CGX_QUAL_ATTRIBUTE                  equ 1
+CGX_QUAL_UNIFORM                    equ 2
+CGX_QUAL_VARYING                    equ 3
+CGX_QUAL_LOCAL                      equ 4
+
+; --- VM opcodes ---
+CGX_OP_NOP                          equ 0
+CGX_OP_MOV                          equ 1       ; dst = srcA
+CGX_OP_ADD                          equ 2       ; dst = srcA + srcB
+CGX_OP_SUB                          equ 3
+CGX_OP_MUL                          equ 4
+CGX_OP_DIV                          equ 5
+CGX_OP_DOT                          equ 6       ; dst.x = dot(srcA, srcB)
+CGX_OP_CROSS                        equ 7       ; dst.xyz = cross(srcA, srcB)
+CGX_OP_NORMALIZE                    equ 8       ; dst = normalize(srcA)
+CGX_OP_LENGTH                       equ 9       ; dst.x = length(srcA)
+CGX_OP_MIX                          equ 10      ; dst = mix(srcA, srcB, srcC)
+CGX_OP_CLAMP                        equ 11      ; dst = clamp(srcA, srcB, srcC)
+CGX_OP_TEXTURE2D                    equ 12      ; dst = texture2D(sampler, uv)
+CGX_OP_MAT4_MUL_VEC4                equ 13      ; dst = mat * vec
+CGX_OP_VEC4_MUL_MAT4                equ 14      ; dst = vec * mat
+CGX_OP_MAT4_MUL_MAT4                equ 15
+CGX_OP_NEG                          equ 16
+CGX_OP_SWIZZLE                      equ 17      ; packed into dst/srcA fields
+CGX_OP_HALT                         equ 255
+
+; --- Shader/compiler limits ---
+CGX_MAX_REGISTERS                   equ 256
+CGX_MAX_ATTRIBS                     equ 16
+CGX_MAX_UNIFORMS                    equ 64
+CGX_MAX_VARYINGS                    equ 8
+CGX_MAX_LOCALS                      equ 64
+CGX_MAX_AST_NODES                   equ 512
+CGX_MAX_TOKENS                      equ 2048
+CGX_MAX_INSTRUCTIONS                equ 1024
+CGX_MAX_SOURCE_LEN                  equ 16384
+
+; --- Shader pool sizes ---
+CGX_MAX_SHADERS                     equ 32
+CGX_MAX_PROGRAMS                    equ 16
+
+; --- Attribute/Uniform slot state ---
+CGX_SLOT_FREE                       equ 0
+CGX_SLOT_USED                       equ 1
