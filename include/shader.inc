@@ -9,6 +9,32 @@ struc Token
     .text                       resq 1
 endstruc
 
+; AST node
+struc ASTNode
+    .type                       resd 1
+    .a                          resd 1
+    .b                          resd 1
+    .c                          resd 1
+    .typeId                     resd 1
+    .pos                        resd 1
+    .pad0                       resd 1
+endstruc
+
+; Parse State
+struc ParseState
+    .tokens                     resq 1
+    .tokenCount                 resd 1
+    .tokenIdx                   resd 1
+    .shaderType                 resd 1
+    .ast                        resq 1
+    .astCount                   resd 1
+    .astCap                     resd 1
+    .symtab                     resq 1
+    .errorPos                   resd 1
+    .errorCode                  resd 1
+    .pad0                       resd 1
+endstruc
+
 ; Token type constants
 CGX_TOK_EOF                     equ 0
 CGX_TOK_IDENT                   equ 1
@@ -30,3 +56,14 @@ CGX_TOK_PLUS_ASSIGN             equ 16
 CGX_TOK_MINUS_ASSIGN            equ 17
 CGX_TOK_STAR_ASSIGN             equ 18
 CGX_TOK_SLASH_ASSIGN            equ 19
+
+; AST node types
+CGX_NODE_PROGRAM                equ 0
+CGX_NODE_MAIN                   equ 1
+CGX_NODE_DECL                   equ 2
+CGX_NODE_ASSIGN                 equ 3
+CGX_NODE_BINARY                 equ 4
+CGX_NODE_UNARY                  equ 5
+CGX_NODE_CALL                   equ 6
+CGX_NODE_MEMBER                 equ 7
+CGX_NODE_LITERAL                equ 9
