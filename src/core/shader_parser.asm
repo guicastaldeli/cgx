@@ -351,7 +351,7 @@ _cgxCoreParserAddSymbol:
     ; Store type and qualifier
     pop r9
     mov [rdx + Symbol.type], r14b
-    mov [rdx + Symbol.qualifier], r15b
+    mov [rdx + Symbol.qualifier], r9b
     mov byte [rdx + Symbol.reg], 0
     mov dword [rdx + Symbol.location], -1
 
@@ -897,26 +897,17 @@ _parseStatement:
 
     ; Could be a local declaration (float/vec2/... with no qualifier) or assignment
     call _peek
+    mov r12, rax
     mov ecx, [rax + Token.type]
     cmp ecx, CGX_TOK_KEYWORD
     jne .tryAssign
 
     ; type keyword check
-    call _tokenIsTypeKeyword
-    cmp eax, -1
-    jne .parseLocalDecl
-
-.checkKeyword:
-    call _peek
-    mov r12, rax
-    mov ecx, [r12 + Token.type]
-    cmp ecx, CGX_TOK_KEYWORD
-    jne .tryAssign
-
     mov rax, r12
     call _tokenIsTypeKeyword
     cmp eax, -1
     jne .parseLocalDecl
+    
 .tryAssign:
     mov rdi, rbx
     call _parseAssignment

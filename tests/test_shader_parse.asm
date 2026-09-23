@@ -35,118 +35,43 @@ section .data
         db 0
     shaderSrcLen equ $ - shaderSrc - 1
 
-    ; --- Token buffer
-    MAX_TOKENS equ 256
-    tokens: times (MAX_TOKENS * 24) db 0
-
-    ; --- AST buffer ---
-    MAX_AST equ 64
-    ast: times (MAX_AST * ASTNode_size) db 0
-
-    ; --- Result strings for MessageBox ---
     title           db "Shader Parse Test", 0
-    msg_tokens      db "Tokens: 000", 0
-    msg_ast         db "AST nodes: 000", 0
-    msg_error       db "Parse FAILED at offset 000", 0
 
+    msg_d0          db "D0: main entered", 0
+    msg_d1          db "D1: CGXInit OK", 0
+    msg_d2          db "D2: about to tokenize", 0
+    msg_d3          db "D3: tokenize returned", 0
+    msg_d4          db "D4: about to parse", 0
+    msg_d5          db "D5: parse returned", 0
+
+    msg_fail_init   db "FAIL: CGXInit returned 0", 0
+    msg_fail_lex    db "FAIL: tokenizer returned 0", 0
+    msg_fail_parse  db "FAIL: parser returned 0", 0
+
+    msg_tok_count   db "Token count: 000", 0
+    msg_ast_count   db "AST node count: 000", 0
+
+    MAX_TOKENS          equ 128
+    MAX_AST             equ 64
+
+section .bss
+    tokens              resb MAX_TOKENS * Token_size
+    ast                 resb MAX_AST * ASTNode_size
 section .text
 
-main:
+_box:
     push rbp
     mov rbp, rsp
-    push rbx
-    push r12
-    push r13
-    sub rsp, 96
-
-    mov rcx, 800
-    mov rdx, 600
-    lea r8, [rel title]
-    call CGXInit
-    cmp eax, 0
-    je .error
-
-    ; Tokenize
-    lea rcx, [rel shaderSrc]
-    lea rdx, [rel tokens]
-    mov r8d, MAX_TOKENS
-    call _cgxCoreLexerTokenize
-    test eax, eax
-    jz .lexError
-
-    mov r12d, eax               ; token count
-
-    ; Format token count into msg_token (3 digits)
-    lea rdi, [rel msg_tokens + 8]
-    mov eax, r12d
-    call _write3digits
+    sub rsp, 32
 
     xor rcx, rcx
-    lea rdx, [rel msg_tokens]
     lea r8, [rel title]
-    mov r9d, 0
+    xor r9d, r9d
     call MessageBoxA
-
-    ; Parse
-    lea rcx, [rel tokens]       ; token array
-    mov edx, r12d               ; token count
-    mov r8d, 1                  ; shaderType: CGX_VERTEX_SHADER
-    lea r9, [rel ast]           ; AST output
-    call _cgxCoreParserParse
-    test eax, eax
-    jz .parseError
-
-    mov r13d, eax               ; AST node count
-
-    ; Format AST count into msg_ast
-    lea rdi, [rel msg_ast + 11]
-    mov eax, r13d
-    call _write3digits
-
-    xor rcx, rcx
-    lea rdx, [rel msg_ast]
-    lea r8, [rel title]
-    mov r9d, 0
-    call MessageBoxA
-
-    call CGXShutdown
-    xor eax, eax
-    jmp .finish
-
-.lexError:
-    xor rcx, rcx
-    lea rdx, [rel msg_error]
-    lea r8, [rel title]
-    mov r9d, 0
-    call MessageBoxA
-    jmp .fail
-
-.parseError:
-    xor rcx, rcx
-    lea rdx, [rel msg_error]
-    lea r8, [rel title]
-    mov r9d, 0
-    call MessageBoxA
-    jmp .fail
-.error:
-    jmp .fail
-.fail:
-    call CGXShutdown
-    mov eax, 1
-
-.finish:
-    add rsp, 96
-    pop r13
-    pop r12
-    pop rbx
+    add rsp, 32
     pop rbp
     ret
 
-; --------------------------------------------
-; _write3digits
-; Input: rdi = destination, eax = value (0..999)
-; Writes three ASCII digits
-; --------------------------------------------
 _write3digits:
     push rbx
     mov rbx, 100
@@ -169,4 +94,103 @@ _write3digits:
     mov [rdi], al
 
     pop rbx
+    ret
+
+main:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    push r12
+    push r13
+    sub rsp, 40
+
+    lea rdx, [rel msg_d0]
+    call _box
+
+    mov rcx, 800
+    mov rdx, 600
+    lea r8, [rel title]
+    call CGXInit
+    test eax, eax
+    jnz .initOk
+    
+    lea rdx, [rel msg_fail_init]
+    call _box
+    jmp .fail
+
+.initOk:
+    lea rdx, [rel msg_d1]
+    call _box
+
+    lea rdx, [rel msg_d2]
+    call _box
+
+    ; Tokenize
+    lea rcx, [rel shaderSrc]
+    lea rdx, [rel tokens]
+    mov r8d, MAX_TOKENS
+    call _cgxCoreLexerTokenize
+    test eax, eax
+    jnz .lexOk
+
+    lea rdx, [msg_fail_lex]
+    call _box
+    jmp .fail
+
+.lexOk:
+    mov r12d, eax
+
+    lea rdx, [rel msg_d3]
+    call _box
+
+    ; Show token count
+    lea rdi, [rel msg_tok_count + 13]
+    mov eax, r12d
+    call _write3digits
+    lea rdx, [rel msg_tok_count]
+    call _box
+
+    lea rdx, [rel msg_d4]
+    call _box
+
+    ; PArse
+    lea rcx, [rel tokens]
+    mov edx, r12d
+    mov r8d, CGX_VERTEX_SHADER
+    lea r9, [rel ast]
+    call _cgxCoreParserParse
+    test eax, eax
+    jnz .parseOk
+
+    lea rdx, [rel msg_fail_parse]
+    call _box
+    jmp .fail
+
+.parseOk:
+    mov r13d, eax
+
+    lea rdx, [rel msg_d5]
+    call _box
+
+    ; Show AST count
+    lea rdi, [rel msg_ast_count + 15]
+    mov eax, r13d
+    call _write3digits
+    lea rdx, [rel msg_ast_count]
+    call _box
+
+    call CGXShutdown
+    xor eax, eax
+    jmp .finish
+
+.fail:
+    call CGXShutdown
+    mov eax, 1
+
+.finish:
+    add rsp, 40
+    pop r13
+    pop r12
+    pop rbx
+    pop rbp
     ret
