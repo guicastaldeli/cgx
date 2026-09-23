@@ -212,7 +212,9 @@ CGX_MAX_REGISTERS                   equ 256
 CGX_MAX_ATTRIBS                     equ 16
 CGX_MAX_UNIFORMS                    equ 64
 CGX_MAX_VARYINGS                    equ 8
+CGX_MAX_ARGS                        equ 16
 CGX_MAX_LOCALS                      equ 64
+CGX_MAX_SYMBOLS                     equ 128
 CGX_MAX_AST_NODES                   equ 512
 CGX_MAX_TOKENS                      equ 2048
 CGX_MAX_INSTRUCTIONS                equ 1024

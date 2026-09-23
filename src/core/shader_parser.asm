@@ -17,6 +17,41 @@ global _cgxCoreParserFindSymbol
 global _cgxCoreParserAddSymbol
 global _cgxCoreParserGetErrorPos
 
+section .data
+    _kw_void                db "void", 0
+    _kw_main                db "main", 0
+
+    ; Type keyword table: ptr, type value
+    _ty_float               db "float", 0
+    _ty_vec2                db "vec2", 0
+    _ty_vec3                db "vec3", 0
+    _ty_vec4                db "vec4", 0
+    _ty_mat4                db "mat4", 0
+    _ty_int                 db "int", 0
+    _ty_sampler2D           db "sampler2D", 0
+
+    align 8
+    _typeTable:
+        dq _ty_float,      CGX_TYPE_FLOAT
+        dq _ty_vec2,       CGX_TYPE_VEC2
+        dq _ty_vec3,       CGX_TYPE_VEC3
+        dq _ty_vec4,       CGX_TYPE_VEC4
+        dq _ty_mat4,       CGX_TYPE_MAT4
+        dq _ty_int,        CGX_TYPE_INT
+        dq _ty_sampler2D,  CGX_TYPE_SAMPLER2D
+
+    ; Qualifier table
+    _ql_attribute           db "attribute", 0
+    _ql_uniform             db "uniform", 0
+    _ql_varying             db "varying", 0
+
+    align 8
+    _qualTable:
+        dq _ql_attribute,   CGX_QUAL_ATTRIBUTE
+        dq _ql_uniform,     CGX_QUAL_UNIFORM
+        dq _ql_varying,     CGX_QUAL_VARYING
+        dq 0,               0
+
 section .text
 
 ; --------------------------------------------
@@ -59,8 +94,8 @@ _cgxCoreParserParse:
     ; Zero the symbol table
     mov rdi, rax
     mov rcx, 640
-    xor eax
-    rep stosp
+    xor eax, eax
+    rep stosq
 
     ; Parse
     mov rdi, rbx
@@ -109,7 +144,7 @@ _peek:
     dec eax
     cmp eax, 0
     jge .ok
-    xor eax
+    xor eax, eax
 
 .ok:
     ; token * Token_size
@@ -197,7 +232,7 @@ _allocNode:
 ; Input: rcx = name ptr, edx = length, r8 = ParseState ptr
 ; Output: eax = symbol index or -1
 ; --------------------------------------------
-_cgxCpreParserFindSymbol:
+_cgxCoreParserFindSymbol:
     push rbx
     push r12
     push r13
@@ -211,7 +246,7 @@ _cgxCpreParserFindSymbol:
     xor r15d, r15d                          ; i = 0
     mov rbx, [r14 + ParseState.symtab]
 
-.symLoop
+.symLoop:
     cmp r15d, CGX_MAX_SYMBOLS
     jge .notFound
 
@@ -243,7 +278,7 @@ _cgxCpreParserFindSymbol:
 
     ; Match
     mov eax, r15d
-    jmp .dome
+    jmp .done
 .next:
     add rbx, Symbol_size
     inc r15d
@@ -276,9 +311,9 @@ _cgxCoreParserAddSymbol:
 
     mov r12, rcx            ; name
     mov r13d, edx           ; length
-    mov r14d, r8            ; type
+    mov r14d, r8d           ; type
     mov r15d, r9d           ; qualifier
-    mov rbx [rbp + 48]      ; ParseState
+    mov rbx, [rbp + 48]     ; ParseState
 
     ; Finf first free slot
     mov rdx, [rbx + ParseState.symtab]
@@ -385,7 +420,7 @@ _tokenIsTypeKeyword:
 ; Input: rax = Token ptr
 ; Output: eax = CGX_QUAL_* or -1
 ; --------------------------------------------
-_tokenQualifierKeyword:
+_tokenIsQualifierKeyword:
     push rbx
     push r12
     push r13
@@ -489,13 +524,6 @@ _parseProgram:
     cmp ecx, CGX_TOK_KEYWORD
     jne .tryDecl
 
-    mov rdx, rax
-    lea rax, [rel _kw_main]
-    mov r12, rdx
-    mov rax, r12
-    lea rdx, [rel _kw_main]
-    call _isKeywordName
-    test eax, eax
     jmp .tryDecl
 
 .tryDecl:
@@ -570,6 +598,7 @@ _parseDeclOrMain:
     call _advance
     mov rdi, rbx
     call _parseMainBody
+    jmp .done
 
 .tryDeclaration:
     mov rdi, rbx
@@ -616,7 +645,7 @@ _parseMainBody:
 
     ; expect ')'
     mov rdi, rbx
-    mov rsi, CGX_TOK_RPAREN
+    mov esi, CGX_TOK_RPAREN
     call _expect
     test eax, eax
     jz .err
@@ -634,7 +663,7 @@ _parseMainBody:
     cmp ecx, CGX_TOK_RBRACE
     je .stmtDone
     cmp ecx, CGX_TOK_EOF
-    je .error
+    je .err
 
     mov rdi, rbx
     call _parseStatement
@@ -703,7 +732,7 @@ _parseDeclaration:
     jne .err
 
     mov rax, r12
-    call _tokenTypeKeyword
+    call _tokenIsTypeKeyword
     cmp eax, -1
     je .err
     mov r15d, eax                       ; type
@@ -757,6 +786,7 @@ _parseDeclaration:
     cmp eax, -1
     je .err
     mov r13d, eax                   ; symbol index
+    mov [rbp - 8], r13d
 
     ; Advance past identifier
     call _advance
@@ -774,6 +804,7 @@ _parseDeclaration:
     call _parseExpression
     cmp eax, -1
     je .err                         ; init mode index
+    mov r13d, eax
     jmp .haveInit
 
 .noInit:
@@ -792,8 +823,9 @@ _parseDeclaration:
     cmp eax, -1
     je .err
 
+    mov ecx, [rbp - 8]
+    mov [rdx + ASTNode.a], ecx
     mov [rdx + ASTNode.a], r13d
-    mov dword [rdx + ASTNode.b], 0
 
     mov eax, 1
     jmp .done
@@ -921,7 +953,7 @@ _parseLocalDecl:
     xor edx, edx
 
 .lenLoop:
-    movzx eax, byte [rcx + edx]
+    movzx eax, byte [rcx + rdx]
     cmp al, 'a'
     jl .lenUp
     cmp al, 'z'
@@ -980,7 +1012,7 @@ _parseLocalDecl:
     cmp eax, -1
     je .err
 
-    mod dword [rdx + ASTNode.a], r14d
+    mov dword [rdx + ASTNode.a], r14d
     mov dword [rdx + ASTNode.b], r13d
 
     mov eax, 1
@@ -1020,6 +1052,7 @@ _parseAssignment:
     call _parseExpression
     cmp eax, -1
     je .err                             ; lhs node
+    mov r12d, eax
 
     ; Expect assignment operator
     call _peek
@@ -1044,7 +1077,7 @@ _parseAssignment:
     ; Parse rhs
     mov rdi, rbx
     call _parseExpression
-    cmp rax, -1
+    cmp eax, -1
     je .err
     ; eax = rhs node
 
@@ -1054,7 +1087,7 @@ _parseAssignment:
     ; Semicolon
     mov rdi, rbx
     mov esi, CGX_TOK_SEMICOLON
-    call _Expect
+    call _expect
     test eax, eax
     jz .err
 
@@ -1091,7 +1124,7 @@ _parseAssignment:
 ; --------------------------------------------
 _parseExpression:
     push rbp
-    mov rsp, rsp
+    mov rbp, rsp
     push rbx
     push r12
     push r13
@@ -1157,8 +1190,8 @@ _parseExpression:
 ; Output: eax = AST node index (or -1 on error)
 ; --------------------------------------------
 _parseTerm:
-    ush rbp
-    mpv rbp, rsp
+    push rbp
+    mov rbp, rsp
     push rbx
     push r12
     push r13
@@ -1182,7 +1215,7 @@ _parseTerm:
     jmp .done
 
 .haveOp:
-    mov r13d, rcx
+    mov r13d, ecx
     call _advance
 
     mov rdi, rbx
@@ -1263,11 +1296,11 @@ _parseFactor:
 
     ; Pack the swizzle mask
     ; rcx = ptr to ident, scan 1-4 chars
-    mov rsi, [r13 + Token.start]
+    mov rsi, [r13 + Token.text]
     xor r14d, r14d                  ; mask accumulator
-    xor ecx, ecx                    ; component count
+    xor r9d, r9d                    ; component count
 .swizzleLoop:
-    movzx eax, byte [rsi + rcx]
+    movzx eax, byte [rsi + r9]
     cmp al, 'x'
     je .cx
     cmp al, 'y'
@@ -1299,22 +1332,15 @@ _parseFactor:
 .cw:
     mov edx, 3
 .packComp:
-    ; Shift into position: byte offset = ecx * 4 bits
-    mov rdi, rcx
-    shl rdi, 3          ; 8 bits per position
-    mov rdi, rdx
-    shl rdi, cl         ; shift by (component index * 8)
-
-    mov rdi, rcx
-    shl rdi, 3
-    mov r8, rdx
-    mov rcx, rdi
-    shl r8, cl
-    or r14d, r8
-    inc rcx
-    cmp ecx, 4
+    mov ecx, r9d
+    shl ecx, 3
+    mov r8d, edx
+    mov r8d, edx
+    shl r8d, cl
+    or r14d, r8d
+    inc r9d
+    cmp r9d, 4
     jl .swizzleLoop
-
 .swizzleDone:
     call _advance
 
@@ -1366,5 +1392,160 @@ _parseFactor:
 ; Input: rdi = ParseState ptr
 ; Output: eax = 1 on success
 ; --------------------------------------------
-_parseArgsPlacehodler:
+_parseArgsPlaceholder:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    sub rsp, 32
+
+    mov rbx, rdi
+
+.argLoop:
+    call _peek
+    mov ecx, [rax + Token.type]
+    cmp ecx, CGX_TOK_RPAREN
+    je .argsDone
+    cmp ecx, CGX_TOK_EOF
+    je .err
+
+    mov rdi, rbx
+    call _parseExpression
+    cmp eax, -1
+    je .err
+
+    call _peek
+    mov ecx, [rax + Token.type]
+    cmp ecx, CGX_TOK_COMMA
+    je .argSkip
+    cmp ecx, CGX_TOK_RPAREN
+    je .argsDone
+    jmp .err
+.argSkip:
+    call _advance
+    jmp .argLoop
+.argsDone:
+    call _advance       ; Console ')'
+    mov eax, 1
+    jmp .done
+
+.err:
+    xor eax, eax
+
+.done:
+    add rsp, 32
+    pop rbx
+    pop rbp
+    ret
+
+; --------------------------------------------
+; _parsePrimary
+; Input: rdi = ParseState ptr
+; Output: eax = AST node index (or -1 on error)
+; --------------------------------------------
+_parsePrimary:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    push r12
+    push r13
+    sub rsp, 40
+
+    mov rbx, rdi
+
+    call _peek
+    mov r12, rax
+
+    mov ecx, [r12 + Token.type]
+
+    ; Number
+    cmp ecx, CGX_TOK_NUMBER
+    je .lit
+
+    ; Identifier
+    cmp ecx, CGX_TOK_IDENT
+    je .ident
+
+    ; Parenthesized expression
+    cmp ecx, CGX_TOK_LPAREN
+    je .paren
+
+    ; Type keyword
+    cmp ecx, CGX_TOK_KEYWORD
+    je .maybeType
+
+    jmp .err
+
+.lit:
+    call _advance
+    mov rdi, CGX_NODE_LITERAL
+    call _allocNode
+    cmp eax, -1
+    je .err
+    mov ecx, [r12 + Token.value]
+    mov [rdx + ASTNode.a], ecx
+    jmp .done
+
+.ident:
+    mov r13d, [rbx + ParseState.tokenIdx]
+    call _advance
+    mov rdi, CGX_NODE_IDENT
+    call _allocNode
+    cmp eax, -1
+    je .err
+    mov [rdx + ASTNode.a], r13d
+    jmp .done
+
+.paren:
+    call _advance
+    mov rdi, rbx
+    call _parseExpression
+    cmp eax, -1
+    je .err
+    mov r12d, eax
     
+    ; Expect ')'
+    mov rdi, rbx
+    mov esi, CGX_TOK_RPAREN
+    call _expect
+    test eax, eax
+    jz .err
+    mov eax, r12d
+    jmp .done
+
+.maybeType:
+    ; Type keyword -- must be followed by '('
+    call _tokenIsTypeKeyword
+    cmp eax, -1
+    je .err
+    call _advance
+    call _peek
+    mov ecx, [rax + Token.type]
+    cmp ecx, CGX_TOK_LPAREN
+    jne .err
+
+    ; Parse args as placeholder
+    call _advance
+    mov rdi, rbx
+    call _parseArgsPlaceholder
+
+    ; CALL node
+    mov rdi, CGX_NODE_CALL
+    call _allocNode
+    cmp eax, -1
+    je .err
+    mov dword [rdx + ASTNode.a], 0
+    mov dword [rdx + ASTNode.b], 0
+    jmp .done
+
+.err:
+    mov rdi, rbx
+    call _error
+    mov eax, -1
+
+.done:
+    add rsp, 40
+    pop r13
+    pop r12
+    pop rbx
+    pop rbp
+    ret

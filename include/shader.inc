@@ -67,3 +67,5 @@ CGX_NODE_UNARY                  equ 5
 CGX_NODE_CALL                   equ 6
 CGX_NODE_MEMBER                 equ 7
 CGX_NODE_LITERAL                equ 9
+CGX_NODE_IDENT                  equ 8
+CGX_NODE_LITERAL                equ 9
