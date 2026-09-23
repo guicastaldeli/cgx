@@ -7,32 +7,12 @@ default rel
 
 %include "constants.inc"
 %include "structs.inc"
+%include "shader.inc"
 
 extern _cgxCoreState
 extern CGXState
 
 global _cgxCoreLexerTokenize
-
-; Token type constants
-CGX_TOK_EOF                     equ 0
-CGX_TOK_IDENT                   equ 1
-CGX_TOK_KEYWORD                 equ 2
-CGX_TOK_NUMBER                  equ 3
-CGX_TOK_LPAREN                  equ 4
-CGX_TOK_RPAREN                  equ 5
-CGX_TOK_LBRACE                  equ 6
-CGX_TOK_RBRACE                  equ 7
-CGX_TOK_COMA                    equ 8
-CGX_TOK_SEMICOLON               equ 0
-CGX_TOK_DOT                     equ 9
-CGX_TOK_ASSIGN                  equ 11
-CGX_TOK_PLUS                    equ 12
-CGX_TOK_MINUS                   equ 13
-CGX_TOK_STAR                    equ 14
-CGX_TOK_SLASH                   equ 15
-CGX_TOK_PLUS_ASSIGN             equ 17
-CGX_TOK_STAR_ASSIGN             equ 18
-CGX_TOK_SLASH_ASSIGN            equ 19
 
 section .text
 
@@ -55,6 +35,7 @@ _cgxCoreLexerTokenize:
     push r14
     push r15
     sub rsp, 64
+    mov [rbp - 8], rcx
 
     mov r12, rcx        ; source ptr (current position)
     mov r13, rdx        ; output token array
@@ -142,71 +123,32 @@ _cgxCoreLexerTokenize:
     .identDone:
         ; rbx = start, r12 = one past end
         ; Compute length
-        mov rax, r12
-        sub rax, rbx
+        mov rsi, r12
+        sub rsi, rbx
+
         ; Check if this is a keyword
         mov rcx, rbx
-        mov edx, eax
+        mov edx, esi
         call _isKeyword
         ; al = 1 if keyword, 0 otherwise
 
         ; Build token
         mov edx, r15d
-        shl edx, 4              ; token index * 16
+        imul edx, Token_size    ; token index * 16
         add rdx, r13            ; rdx = &tokens[r15]
 
         test al, al
-        jz .identNotKeyword
-
+        jz .identStoreIdent
         mov dword [rdx + 0], CGX_TOK_KEYWORD
-        jmp .identCommon
-    .identNotKeyword:
+        jmp .identStoreRest
+    .identStoreIdent:
         mov dword [rdx + 0], CGX_TOK_IDENT
-    .identCommon:
+    .identStoreRest:
         mov rax, rbx
-        sub rax, qword [rel _lexerSourceBase]       ; not used; store offset instad
-
-        ; compute offset = rbx - source base
-        mov [rdx + 8], rbx      ; .text = ptr to identifier in source
-
-        ; .pos
-        mov rax, rbx
-        mov [rdx + 4], eax      ; rough offset (low 32 bits of ptr)
-
-        ; .value unused
-        mov dword [rdx + 8]
-
-        ; redone
-        jmp .identActuallyStore
-    .identActuallyStore:
-        ; Rewrite as a clean store sequence
-        mov edx, r15d
-        shl edx, 4
-        add edx, r13
-
-        ; Determine keyword vs ident
-        mov rcx, rbx
-        mov rsi, r12
-        sub rsi, rbx            ; rsi = length
-        mov rdi, rcx
-        mov ecx, esi
-        call _isKeywordLen
-        test al, al
-        jz .aiIdent
-
-        mov dword [rdx + 0], CGX_TOK_KEYWORD
-        jmp .aiStore
-    .aiIdent:
-        mov dword [rdx + 0], CGX_TOK_IDENT
-    .aiStore:
-        ; pos = rbx - source
-        mov rax, rbx
-        sub rax, [rbp - 8]          ; source base saved at rbp-8
-        mov [rdx + 4], eax
-
-        mov dword [rdx + 8], 0      ; value unused
-
-        mov [rdx + 16], rbx         ; text pointer
+        sub rax, [rbp - 8]
+        mov [rdx + 4], eax          ; pos
+        mov dword [rdx + 8], 0      ; value
+        mov [rdx + 16], rbx         ; text ptr
 
         inc r15d
         jmp .tokenLoop
@@ -230,7 +172,7 @@ _cgxCoreLexerTokenize:
         ; Fractional part
         movzx eax, byte [r12]
         cmp al, '.'
-        jne .numFractionalDone
+        jne .numFracDone
         inc r12
     .numFracLoop:
         movzx eax, byte [r12]
@@ -252,7 +194,7 @@ _cgxCoreLexerTokenize:
 
         ; Store value
         mov edx, r15d
-        shl edx, 4
+        imul edx, Token_size
         add rdx, r13
 
         mov dword [rdx + 0], CGX_TOK_NUMBER
@@ -263,7 +205,7 @@ _cgxCoreLexerTokenize:
 
         movss [rdx + 8], xmm0       ; value = float bits
         
-        mov qword [rdx + 16]        ; text unused
+        mov qword [rdx + 16], 0     ; text unused
 
         inc r15d
         jmp .tokenLoop
@@ -299,8 +241,8 @@ _cgxCoreLexerTokenize:
         jmp .emitPunct
     
     .emitPunct:
-        mov eax, r15d
-        shl edx, 4
+        mov edx, r15d
+        imul edx, Token_size
         add rdx, r13
 
         mov [rdx + 0], eax
@@ -337,7 +279,7 @@ _cgxCoreLexerTokenize:
         jmp .emit2
     .opMinus:
         mov eax, CGX_TOK_MINUS
-        jmp emitPunct
+        jmp .emitPunct
     .maybeStar:
         cmp byte [r12 + 1], '='
         jne .opStar
@@ -356,7 +298,7 @@ _cgxCoreLexerTokenize:
         jmp .emitPunct
     .emit2:
         mov edx, r15d
-        shl edx, 4
+        imul edx, Token_size
         add rdx, r13
 
         mov [rdx + 0], eax
@@ -379,7 +321,7 @@ _cgxCoreLexerTokenize:
     ;
     .emitEOF:
         mov edx, r15d
-        shl edx, 4
+        imul edx, Token_size
         add rdx, r13
 
         mov dword [rdx + 0], CGX_TOK_EOF
@@ -396,7 +338,7 @@ _cgxCoreLexerTokenize:
         jmp .done
     
     .fail:
-        xor eax,
+        xor eax, eax
     
     .done:
         add rsp, 64
@@ -440,7 +382,7 @@ _skip:
     cmp byte [r12 + 1], '/'
     je .lineComment
     cmp byte [r12 + 1], '*'
-    je .blockCOmment
+    je .blockComment
     jmp .done
 
 .advance:
@@ -468,7 +410,7 @@ _skip:
     cmp al, '*'
     jne .bcAdvance
     cmp byte [r12 + 1], '/'
-    je .vcEnd
+    je .bcEnd
 .bcAdvance:
     inc r12
     jmp .bcLoop
@@ -487,7 +429,7 @@ _skip:
 _isIdentStart:
     ; a-z
     cmp al, 'a'
-    je .tryUpper
+    jl .tryUpper
     cmp al, 'z'
     jle .yes
 
@@ -533,9 +475,12 @@ _isIdentChar:
 ; --------------------------------------------
 _isKeyword:
     ; Copy identifier to a scratch buffer, null-terminate, compare with table
+    push rbp
+    mov rbp, rsp
     push rbx
     push r12
     push r13
+    sub rsp, 40
 
     mov rbx, rcx        ; source ptr
     mov r12d, edx       ; length
@@ -545,7 +490,7 @@ _isKeyword:
     jg .no
 
     ; Copy to scratch
-    lea rdi, [rsp - 32]
+    lea rdi, [rbp - 48]
     mov rcx, r12
     mov rsi, rbx
     rep movsb
@@ -553,14 +498,14 @@ _isKeyword:
 
     ; Now compare with keyword table
     lea r13, [rel _keywordTable]
-
+    
 .kwLoop:
     mov rcx, [r13]          ; ptr to keyword string
     test rcx, rcx
     jz .no                  ; end of table
 
     ; Compare strings
-    lea rsi, [rsp - 32]
+    lea rsi, [rbp - 48]
 .kwCmp:
     mov al, [rsi]
     mov dl, [rcx]
@@ -582,9 +527,11 @@ _isKeyword:
     xor al, al
 
 .done:
+    add rsp, 40
     pop r13
     pop r12
     pop rbx
+    pop rbp
     ret
 
 ; --------------------------------------------
@@ -605,16 +552,17 @@ _parseFloatFromText:
 .intLoop:
     test r12, r12
     jz .intDone
-    movzx ecx byte [rbx]
+    movzx ecx, byte [rbx]
     cmp cl, '0'
     jl .intDone
     cmp cl, '9'
+    jg .intDone
     imul eax, eax, 10
     sub ecx, '0'
     add eax, ecx
     inc rbx
     dec r12
-    jmp .intLoop:
+    jmp .intLoop
 .intDone:
     cvtsi2ss xmm0, eax      ; xmm0 = integer part as float
 
@@ -630,15 +578,13 @@ _parseFloatFromText:
     ; Multiplier = 0.1, 0.01, ...
     mov eax, 0x3DCCCCCD     ; 0.1f
     movd xmm1, eax
-    mov eax, 0x3DCCCCCD     ; reuse
-    movd xmm2, eax
 .fracLoop:
     test r12, r12
     jz .done
     movzx ecx, byte [rbx]
     cmp cl, '0'
     jl .done
-    cmp cl '9'
+    cmp cl, '9'
     jg .done
 
     sub ecx, '0'
@@ -667,8 +613,6 @@ _isKeywordLen:
     jmp _isKeyword
 
 section .data
-    _lexerSourceBase            eq 0
-
     ; Keyword table: array of qword pointers, null-terminated
     _kw_attribute               db "attribute", 0
     _kw_uniform                 db "uniform", 0
@@ -681,7 +625,7 @@ section .data
     _kw_mat4                    db "mat4", 0
     _kw_int                     db "int", 0
     _kw_sampler2D               db "sampler2D", 0
-    _kw_main                    db "main"
+    _kw_main                    db "main", 0
 
     align 8
     _keywordTable:
