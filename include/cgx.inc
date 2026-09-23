@@ -86,3 +86,27 @@ extern CGXTexImage2D
 extern CGXTexParameteri
 extern CGXTexEnvi
 extern CGXActiveTexture
+
+; --- Shaders ---
+extern CGXCreateShader
+extern CGXShaderSource
+extern CGXCompileShader
+extern CGXDeleteShader
+extern CGXGetShaderInfoLog
+
+extern CGXCreateProgram
+extern CGXAttachShader
+extern CGXLinkProgram
+extern CGXUseProgram
+extern CGXDeleteProgram
+extern CGXGetUniformLocation
+extern CGXGetAttribLOocation
+
+extern CGXUniform1f
+extern CGXUniform2f
+extern CGXUniform3f
+extern CGXUniform4f
+extern CGXUniform1i
+extern CGXUniform3fv
+extern CGXUniform4fv
+extern CGXUniformMatrix4fv
