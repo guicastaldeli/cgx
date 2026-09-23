@@ -41,7 +41,7 @@ section .data
 
     ; --- AST buffer ---
     MAX_AST equ 64
-    ast: times (MAX_AST * 32) db 0
+    ast: times (MAX_AST * ASTNode_size) db 0
 
     ; --- Result strings for MessageBox ---
     title           db "Shader Parse Test", 0

@@ -313,9 +313,11 @@ _cgxCoreParserAddSymbol:
     mov r13d, edx           ; length
     mov r14d, r8d           ; type
     mov r15d, r9d           ; qualifier
-    mov rbx, [rbp + 48]     ; ParseState
+    mov rbx, r10            ; ParseState
 
-    ; Finf first free slot
+    push r9
+
+    ; Find first free slot
     mov rdx, [rbx + ParseState.symtab]
     xor ecx, ecx
 
@@ -333,7 +335,7 @@ _cgxCoreParserAddSymbol:
 .found:
     ; rdx = free symbol slot, ecx = index
     ; Copy name (cap at 31 chars)
-    mov edx, ecx            ; save index
+    mov r15d, ecx            ; save index
     mov ecx, r13d
     cmp ecx, 31
     jle .lenOk
@@ -347,15 +349,17 @@ _cgxCoreParserAddSymbol:
     pop rdi
 
     ; Store type and qualifier
+    pop r9
     mov [rdx + Symbol.type], r14b
     mov [rdx + Symbol.qualifier], r15b
     mov byte [rdx + Symbol.reg], 0
     mov dword [rdx + Symbol.location], -1
 
-    mov eax, edi
+    mov eax, r15d
     jmp .done
 
 .fail:
+    pop r9
     mov eax, -1
 
 .done:
@@ -781,7 +785,9 @@ _parseDeclaration:
     ; Call AddSymbol
     mov r8d, r15d                   ; type
     mov r9d, r14d                   ; qualifier
-    mov [rsp + 32], rbx             ; ParseState (7th arg on stack)
+    mov r8d, r15d
+    mov r9d, r14d
+    mov r10, rbx
     call _cgxCoreParserAddSymbol
     cmp eax, -1
     je .err
@@ -825,7 +831,7 @@ _parseDeclaration:
 
     mov ecx, [rbp - 8]
     mov [rdx + ASTNode.a], ecx
-    mov [rdx + ASTNode.a], r13d
+    mov [rdx + ASTNode.b], r13d
 
     mov eax, 1
     jmp .done
@@ -884,6 +890,7 @@ _parseStatement:
     push rbp
     mov rbp, rsp
     push rbx
+    push r12
     sub rsp, 32
 
     mov rbx, rdi
@@ -899,6 +906,17 @@ _parseStatement:
     cmp eax, -1
     jne .parseLocalDecl
 
+.checkKeyword:
+    call _peek
+    mov r12, rax
+    mov ecx, [r12 + Token.type]
+    cmp ecx, CGX_TOK_KEYWORD
+    jne .tryAssign
+
+    mov rax, r12
+    call _tokenIsTypeKeyword
+    cmp eax, -1
+    jne .parseLocalDecl
 .tryAssign:
     mov rdi, rbx
     call _parseAssignment
@@ -910,6 +928,7 @@ _parseStatement:
 
 .done:
     add rsp, 32
+    pop r12
     pop rbx
     pop rbp
     ret
@@ -978,7 +997,7 @@ _parseLocalDecl:
 .lenDone:
     mov r8d, r15d
     mov r9d, CGX_QUAL_LOCAL
-    mov [rsp + 32], rbx
+    mov r10, rbx
     call _cgxCoreParserAddSymbol
     cmp eax, -1
     je .err
