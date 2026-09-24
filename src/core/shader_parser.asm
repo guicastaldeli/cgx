@@ -16,6 +16,11 @@ global _cgxCoreParserParse
 global _cgxCoreParserFindSymbol
 global _cgxCoreParserAddSymbol
 global _cgxCoreParserGetErrorPos
+global _cgxDebugQual
+global _cgxDebugType
+global _cgxDebugQualTable
+global _cgxDebugRawByte
+global _parserState
 
 section .data
     _kw_void                db "void", 0
@@ -32,13 +37,14 @@ section .data
 
     align 8
     _typeTable:
-        dq _ty_float,      CGX_TYPE_FLOAT
-        dq _ty_vec2,       CGX_TYPE_VEC2
-        dq _ty_vec3,       CGX_TYPE_VEC3
-        dq _ty_vec4,       CGX_TYPE_VEC4
-        dq _ty_mat4,       CGX_TYPE_MAT4
-        dq _ty_int,        CGX_TYPE_INT
-        dq _ty_sampler2D,  CGX_TYPE_SAMPLER2D
+        dq _ty_float,       CGX_TYPE_FLOAT
+        dq _ty_vec2,        CGX_TYPE_VEC2
+        dq _ty_vec3,        CGX_TYPE_VEC3
+        dq _ty_vec4,        CGX_TYPE_VEC4
+        dq _ty_mat4,        CGX_TYPE_MAT4
+        dq _ty_int,         CGX_TYPE_INT
+        dq _ty_sampler2D,   CGX_TYPE_SAMPLER2D,
+        dq 0,               0
 
     ; Qualifier table
     _ql_attribute           db "attribute", 0
@@ -52,7 +58,37 @@ section .data
         dq _ql_varying,     CGX_QUAL_VARYING
         dq 0,               0
 
+section .bss
+    _parserState            resb ParseState_size
+    _parserSymtab           resb CGX_MAX_SYMBOLS * Symbol_size
 section .text
+
+_cgxDebugQual:
+    push rbp
+    mov rbp, rsp
+    mov rax, rcx
+    call _tokenIsQualifierKeyword
+    pop rbp
+    ret
+
+_cgxDebugType:
+    push rbp
+    mov rbp, rsp
+    mov rax, rcx
+    call _tokenIsTypeKeyword
+    pop rbp
+    ret
+
+_cgxDebugQualTable:
+    lea rax, [rel _qualTable]
+    shl rcx, 4
+    add rax, rcx
+    mov rax, [rax]
+    ret
+
+_cgxDebugRawByte:
+    movzx eax, byte [rcx]
+    ret
 
 ; --------------------------------------------
 ; _cgxCoreParserParse
@@ -71,11 +107,9 @@ _cgxCoreParserParse:
     push r13
     push r14
     push r15
-    sub rsp, 5280
+    sub rsp, 40
 
-    ; Set up ParseState at [rbp - 56]
-    ; ParseState_size = 56
-    lea rbx, [rbp - 56]
+    lea rbx, [rel _parserState]
 
     mov [rbx + ParseState.tokens], rcx
     mov [rbx + ParseState.tokenCount], edx
@@ -87,13 +121,11 @@ _cgxCoreParserParse:
     mov dword [rbx + ParseState.errorPos], 0
     mov dword [rbx + ParseState.errorCode], 0
 
-    ; Symbol table at [rbp - 5224] (5120 bytes)
-    lea rax, [rbp - 5224]
+    lea rax, [rel _parserSymtab]
     mov [rbx + ParseState.symtab], rax
 
-    ; Zero the symbol table
     mov rdi, rax
-    mov rcx, 640
+    mov rcx, CGX_MAX_SYMBOLS * Symbol_size / 8
     xor eax, eax
     rep stosq
 
@@ -111,7 +143,7 @@ _cgxCoreParserParse:
     xor eax, eax
 
 .done:
-    add rsp, 5280
+    add rsp, 40
     pop r15
     pop r14
     pop r13
@@ -126,6 +158,7 @@ _cgxCoreParserParse:
 ; Output: eax = error position
 ; --------------------------------------------
 _cgxCoreParserGetErrorPos:
+    lea rax, [rel _parserState]
     mov eax, [rcx + ParseState.errorPos]
     ret
 
@@ -397,10 +430,10 @@ _tokenIsTypeKeyword:
 .typeCmp:
     mov al, [rsi]
     mov dl, [rdi]
+    test dl, dl
+    jz .typeEnd
     cmp al, dl
     jne .typeNext
-    test al, al
-    jz .typeMatch
     inc rsi
     inc rdi
     jmp .typeCmp
@@ -410,6 +443,34 @@ _tokenIsTypeKeyword:
 .typeMatch:
     mov eax, [rbx + 8]          ; type value
     jmp .done
+.typeEnd:
+    test al, al
+    jz .typeMatch
+    cmp al, ' '
+    je .typeMatch
+    cmp al, 9
+    je .typeMatch
+    cmp al, 10
+    je .typeMatch
+    cmp al, 13
+    je .typeMatch
+    cmp al, ';'
+    je .typeMatch
+    cmp al, '('
+    je .typeMatch
+    cmp al, ')'
+    je .typeMatch
+    cmp al, '{'
+    je .typeMatch
+    cmp al, '}'
+    je .typeMatch
+    cmp al, ','
+    je .typeMatch
+    cmp al, '.'
+    je .typeMatch
+    cmp al, '='
+    je .typeMatch
+    jmp .typeNext
 .notType:
     mov eax, -1
 
@@ -441,18 +502,47 @@ _tokenIsQualifierKeyword:
 .qualCmp:
     mov al, [rsi]
     mov dl, [rdi]
+    test dl, dl
+    jz .qualEnd
     cmp al, dl
     jne .qualNext
-    test al, al
-    jz .qualMatch
     inc rsi
-    jmp .qualCmp
+    inc rdi
+    jmp .qualCmp    
 .qualNext:
     add rbx, 16
     jmp .qualLoop
 .qualMatch:
     mov eax, [rbx + 8]
     jmp .done
+.qualEnd:
+    test al, al
+    jz .qualMatch
+    cmp al, ' '
+    je .qualMatch
+    cmp al, 9
+    je .qualMatch
+    cmp al, 10
+    je .qualMatch
+    cmp al, 13
+    je .qualMatch
+    cmp al, ';'
+    je .qualMatch
+    cmp al, '('
+    je .qualMatch
+    cmp al, ')'
+    je .qualMatch
+    cmp al, '{'
+    je .qualMatch
+    cmp al, '}'
+    je .qualMatch
+    cmp al, ','
+    je .qualMatch
+    cmp al, '.'
+    je .qualMatch
+    cmp al, '='
+    je .qualMatch
+    jmp .qualNext
 .notQual:
     mov eax, -1
 
@@ -478,13 +568,42 @@ _isKeywordName:
 .loop:
     mov al, [r12]
     mov dl, [r13]
+    test dl, dl
+    jz .endCheck
     cmp al, dl
     jne .no
-    test al, al
-    jz .yes
     inc r12
     inc r13
     jmp .loop
+
+.endCheck:
+    test al, al
+    jz .yes
+    cmp al, ' '
+    je .yes
+    cmp al, 9
+    je .yes
+    cmp al, 10
+    je .yes
+    cmp al, 13
+    je .yes
+    cmp al, ';'
+    je .yes
+    cmp al, '('
+    je .yes
+    cmp al, ')'
+    je .yes
+    cmp al, '{'
+    je .yes
+    cmp al, '}'
+    je .yes
+    cmp al, ','
+    je .yes
+    cmp al, '.'
+    je .yes
+    cmp al, '='
+    je .yes
+    jmp .no
 
 .yes:
     mov eax, 1
@@ -678,6 +797,14 @@ _parseMainBody:
     ; consume '}'
     call _advance
 
+    mov rdi, CGX_NODE_MAIN
+    call _allocNode
+    cmp eax, -1
+    je .err
+
+    mov dword [rdx + ASTNode.a], 0
+    mov dword [rdx + ASTNode.b], 0
+
     mov eax, 1
     jmp .done
 
@@ -792,7 +919,7 @@ _parseDeclaration:
     cmp eax, -1
     je .err
     mov r13d, eax                   ; symbol index
-    mov [rbp - 8], r13d
+    mov [rbp - 56], r13d
 
     ; Advance past identifier
     call _advance
@@ -829,7 +956,7 @@ _parseDeclaration:
     cmp eax, -1
     je .err
 
-    mov ecx, [rbp - 8]
+    mov ecx, [rbp - 56]
     mov [rdx + ASTNode.a], ecx
     mov [rdx + ASTNode.b], r13d
 
