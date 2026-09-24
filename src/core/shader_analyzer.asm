@@ -74,7 +74,7 @@ _cgxCoreAnalyze:
     mov ecx, [rdi + ASTNode.type]
 
     cmp ecx, CGX_NODE_IDENT         ; NODE_IDENT
-    je .resoveIdent
+    je .resolveIdent
     cmp ecx, CGX_NODE_DECL          ; NODE_DECL
     je .resolveDecl
     cmp ecx, CGX_NODE_CALL          ; NODE_CALL
@@ -161,19 +161,19 @@ _cgxCoreAnalyze:
 .identMaybeBuiltin:
     ; Check for gl_Position / gl_FragColor by comparing the name string
     mov rdi, [rbp - 16]                 ; token ptr
-    mov rsi, [rdi + Token.next]
+    mov rsi, [rdi + Token.text]
 
     lea rdx, [rel _name_gl_Position]
     call _strEq
     test eax, eax
-    jnz .isGlPosition
+    jnz .isGLPosition
     
     mov rdi, [rbp - 16]
     mov rsi, [rdi + Token.text]
     lea rdx, [rel _name_gl_FragColor]
     call _strEq
     test eax, eax
-    jnz .isGlFragColor
+    jnz .isGLFragColor
 
     ; Unknown Identifier -- set type to vec4 as fallback
     mov rdi, [rbp - 8]
@@ -191,7 +191,7 @@ _cgxCoreAnalyze:
     mov dword [rdi + ASTNode.a], 0                          ; symbol index 0 = gl_Position
     mov dword [rdi + ASTNode.typeId], CGX_TYPE_VEC4
     jmp .nextNode
-.isGlFragColor:
+.isGLFragColor:
     mov rdi, [rbp - 8]
     mov dword [rdi + ASTNode.a], 1                          ; symbol index 1 = gl_FragColor
     mov dword [rdi + ASTNode.typeId], CGX_TYPE_VEC4
@@ -285,7 +285,7 @@ _cgxCoreAnalyze:
     ; normalize?
     mov rdi, rsi
     lea rdx, [rel _fn_normalize]
-    call _strQu
+    call _strEq
     test eax, eax
     jnz .isNormalize
 
@@ -307,7 +307,7 @@ _cgxCoreAnalyze:
     mov dword [rdi + ASTNode.typeId], CGX_TYPE_VEC3
     jmp .nextNode
 .isVec4:
-    mov rdi, [rdp - 8]
+    mov rdi, [rbp - 8]
     mov dword [rdi + ASTNode.typeId], CGX_TYPE_VEC4
     jmp .nextNode
 .isMat4:
@@ -366,7 +366,7 @@ _cgxCoreAnalyze:
 .typeAssign:
     mov eax, [rdi + ASTNode.b]
     cmp eax, -1
-    je .nextNde
+    je .nextNode
     mov ecx, eax
     imul ecx, ASTNode_size
     mov rsi, r12
@@ -398,7 +398,7 @@ _cgxCoreAnalyze:
 ; User symbols start at register 2
 ;;;;;;;;;;
 .assignRegs:
-    mov rsi, [r15 + ParseSTate.symtab]
+    mov rsi, [r15 + ParseState.symtab]
     xor eax, eax                                ; symbol index
     mov ecx, 2                                  ; next free register
 

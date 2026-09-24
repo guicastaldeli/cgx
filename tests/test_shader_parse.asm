@@ -18,6 +18,7 @@ extern CGXShutdown
 extern MessageBoxA
 
 extern _parserState
+extern _cgxCoreAnalyze
 extern _cgxCoreLexerTokenize
 extern _cgxCoreParserParse
 extern _cgxCoreParserGetErrorPos
@@ -47,10 +48,12 @@ section .data
     msg_d3              db "D3: tokenize returned", 0
     msg_d4              db "D4: about to parse", 0
     msg_d5              db "D5: parse returned", 0
+    msg_d6              db "D6: analyze returned", 0
 
     msg_fail_init       db "FAIL: CGXInit returned 0", 0
     msg_fail_lex        db "FAIL: tokenizer returned 0", 0
     msg_fail_parse      db "FAIL: parser returned 0", 0
+    msg_fail_analyze    db "FAIL: analyzer returned 0", 0
 
     msg_tok_count       db "Token count: 000", 0
     msg_ast_count       db "AST node count: 000", 0
@@ -235,6 +238,22 @@ main:
     mov eax, r13d
     call _write3digits
     lea rdx, [rel msg_ast_count]
+    call _box
+
+    ; Run analyzer
+    lea rcx, [rel ast]          ; AST arrau
+    mov edx, r13d               ; node count
+    lea r8, [rel tokens]        ; token array
+    call _cgxCoreAnalyze
+    test eax, eax
+    jnz .analyzeOk
+
+    lea rdx, [rel msg_fail_analyze]
+    call _box
+    jmp .fail
+
+.analyzeOk:
+    lea rdx, [rel msg_d6]
     call _box
 
     call CGXShutdown
