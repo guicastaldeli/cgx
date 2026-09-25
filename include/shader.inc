@@ -26,12 +26,23 @@ struc ParseState
     .tokenCount                 resd 1
     .tokenIdx                   resd 1
     .shaderType                 resd 1
+    .pad0                       resd 1
     .ast                        resq 1
     .astCount                   resd 1
     .astCap                     resd 1
     .symtab                     resq 1
     .errorPos                   resd 1
     .errorCode                  resd 1
+    .pad1                       resd 1
+endstruc
+
+; VM instruction
+struc Instr
+    .op                         resd 1 ; opcode (CGX_OP_*)
+    .dst                        resd 1 ; destination register (or -1)
+    .srcA                       resd 1 ; source A register (or -1)
+    .srcB                       resd 1 ; source B register (or -1)
+    .srcC                       resd 1 ; third operand (mix, clamp) or -1
     .pad0                       resd 1
 endstruc
 
@@ -66,6 +77,5 @@ CGX_NODE_BINARY                 equ 4
 CGX_NODE_UNARY                  equ 5
 CGX_NODE_CALL                   equ 6
 CGX_NODE_MEMBER                 equ 7
-CGX_NODE_LITERAL                equ 9
 CGX_NODE_IDENT                  equ 8
 CGX_NODE_LITERAL                equ 9

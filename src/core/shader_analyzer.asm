@@ -32,6 +32,9 @@ section .data
     _fn_normalize               db "normalize", 0
     _fn_texture2D               db "texture2D", 0
 
+    global _caDebugStage
+    _caDebugStage               db 0
+
 section .text
 
 ; --------------------------------------------
@@ -43,6 +46,8 @@ section .text
 ; Uses _parserState for symtab access
 ; --------------------------------------------
 _cgxCoreAnalyze:
+    mov byte [rel _caDebugStage], 1
+    
     push rbp
     mov rbp, rsp
     push rbx
@@ -159,6 +164,8 @@ _cgxCoreAnalyze:
     jmp .nextNode
 
 .identMaybeBuiltin:
+    mov byte [rel _caDebugStage], 20
+    
     ; Check for gl_Position / gl_FragColor by comparing the name string
     mov rdi, [rbp - 16]                 ; token ptr
     mov rsi, [rdi + Token.text]
@@ -187,11 +194,15 @@ _cgxCoreAnalyze:
 ;
 ;;;;;;;;;;
 .isGLPosition:
+    mov byte [rel _caDebugStage], 10
+
     mov rdi, [rbp - 8]
     mov dword [rdi + ASTNode.a], 0                          ; symbol index 0 = gl_Position
     mov dword [rdi + ASTNode.typeId], CGX_TYPE_VEC4
     jmp .nextNode
 .isGLFragColor:
+    mov byte [rel _caDebugStage], 11
+
     mov rdi, [rbp - 8]
     mov dword [rdi + ASTNode.a], 1                          ; symbol index 1 = gl_FragColor
     mov dword [rdi + ASTNode.typeId], CGX_TYPE_VEC4
@@ -443,10 +454,10 @@ _strEq:
 .loop:
     mov al, [rsi]
     mov cl, [rdx]
+    test cl, cl
+    jz .yes
     cmp al, cl
     jne .no
-    test al, al
-    jz .yes
     inc rsi
     inc rdx
     jmp .loop

@@ -1,5 +1,5 @@
 ; ============================================
-; core/shader_paser.asm
+; core/shader_parser.asm
 ; GLSL recursive descent parser -> flat AST
 ; ============================================
 

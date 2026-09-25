@@ -26,6 +26,8 @@ extern _cgxDebugType
 extern _cgxDebugQual
 extern _cgxDebugQualTable
 extern _cgxDebugRawByte
+extern _cgxCoreCompile
+extern _ccDebugStage
 
 section .data
     shaderSrc:
@@ -49,29 +51,37 @@ section .data
     msg_d4              db "D4: about to parse", 0
     msg_d5              db "D5: parse returned", 0
     msg_d6              db "D6: analyze returned", 0
+    msg_d7              db "D7: compile returned", 0
 
     msg_fail_init       db "FAIL: CGXInit returned 0", 0
     msg_fail_lex        db "FAIL: tokenizer returned 0", 0
     msg_fail_parse      db "FAIL: parser returned 0", 0
     msg_fail_analyze    db "FAIL: analyzer returned 0", 0
+    msg_fail_compile    db "FAIL: compiler returned 0", 0
 
     msg_tok_count       db "Token count: 000", 0
     msg_ast_count       db "AST node count: 000", 0
+    msg_instr_count     db "Instr count: 000", 0
 
     msg_errpos          db "Error pos: 000", 0
     msg_tok0            db "Tok0 type: 000", 0
-    
-    msg_qualret         db "Qual ret: 000", 0
-    msg_typeret         db "Type ret: 000", 0
-    msg_textbyte        db "Text byte: 000", 0
-    msg_qtabchar        db "Qtab char: 000", 0
+    msg_stage           db "STAGE: 000", 0
+
+    msg_node0type       db "Node0 type: 000", 0
+    ;msg_qualret        db "Qual ret: 000", 0
+    ;msg_typeret        db "Type ret: 000", 0
+    ;msg_textbyte       db "Text byte: 000", 0
+    ;msg_qtabchar       db "Qtab char: 000", 0
 
     MAX_TOKENS          equ 128
     MAX_AST             equ 64
+    MAX_INSTRS          equ 256
 
 section .bss
     tokens              resb MAX_TOKENS * Token_size
     ast                 resb MAX_AST * ASTNode_size
+    instrs              resb MAX_INSTRS * Instr_size
+
 section .text
 
 _box:
@@ -117,7 +127,8 @@ main:
     push rbx
     push r12
     push r13
-    sub rsp, 40
+    push r14
+    sub rsp, 48
 
     lea rdx, [rel msg_d0]
     call _box
@@ -159,39 +170,6 @@ main:
     mov eax, [rel tokens + Token.type]
     call _write3digits
     lea rdx, [rel msg_tok0]
-    call _box
-
-    lea rcx, [rel tokens]
-    call _cgxDebugQual
-    and eax, 0xFF
-    lea rdi, [rel msg_qualret + 10]
-    call _write3digits
-    lea rdx, [rel msg_qualret]
-    call _box
-
-    lea rcx, [rel tokens]
-    call _cgxDebugType
-    and eax, 0xFF
-    lea rdi, [rel msg_typeret + 10]
-    call _write3digits
-    lea rdx, [rel msg_typeret]
-    call _box
-
-    lea rcx, [rel tokens]
-    mov rcx, [rcx + Token.text]
-    call _cgxDebugRawByte
-    lea rdi, [rel msg_textbyte + 11]
-    call _write3digits
-    lea rdx, [rel msg_textbyte]
-    call _box
-
-    xor ecx, ecx
-    call _cgxDebugQualTable
-    mov rcx, rax
-    call _cgxDebugRawByte
-    lea rdi, [rel msg_qtabchar + 11]
-    call _write3digits
-    lea rdx, [rel msg_qtabchar]
     call _box
 
     lea rdx, [rel msg_d3]
@@ -253,7 +231,37 @@ main:
     jmp .fail
 
 .analyzeOk:
-    lea rdx, [rel msg_d6]
+    ;lea rdx, [rel msg_d6]
+    ;call _box
+
+    lea rdi, [rel msg_node0type + 12]
+    mov eax, [rel ast + ASTNode.type * 4 + ASTNode.type]
+    call _write3digits
+    lea rdx, [rel msg_node0type]
+    call _box
+
+    lea rcx, [rel ast]
+    mov edx, r13d
+    lea r8, [rel tokens]
+    lea r9, [rel instrs]
+    mov qword [rsp + 32], MAX_INSTRS
+    call _cgxCoreCompile
+    mov r14d, eax
+
+    lea rdx, [rel msg_d7]
+    call _box
+    
+    movzx eax, byte [rel _ccDebugStage]
+    lea rdi, [rel msg_stage + 7]
+    call _write3digits
+    lea rdx, [rel msg_stage]
+    call _box
+
+    lea rdi, [rel msg_instr_count + 13]
+    mov eax, r14d
+    xor edx, edx
+    call _write3digits
+    lea rdx, [rel msg_instr_count]
     call _box
 
     call CGXShutdown
@@ -265,7 +273,8 @@ main:
     mov eax, 1
 
 .finish:
-    add rsp, 40
+    add rsp, 48
+    pop r14
     pop r13
     pop r12
     pop rbx
