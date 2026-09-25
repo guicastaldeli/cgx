@@ -462,7 +462,61 @@ _cgxCoreVMExecute:
 ; dst = vec4(srcA) * mat4(srcB)
 ;;;;;;;;;;
 .opVec4MulMat4:
-    ;  TODO: finish later
+    ; Load vec4 from srcA
+    mov eax, [rbx + Instr.srcA]
+    shl eax, 4
+    lea rsi, [r12 + VMState.regs + rax]
+    movups xmm4, [rsi]                      ; v
+
+    ; Load matrix columns from srcB
+    mov eax, [rbx + Instr.srcB]
+    shl eax, 4
+    lea rsi, [r12 + VMState.regs + rax]
+    movups xmm5, [rsi]                      ; col0
+    movups xmm6, [rsi + 16]                 ; col1
+    movups xmm7, [rsi + 32]                 ; col2
+    movups xmm8, [rsi + 48]                 ; col3
+
+    ; rsult.x = dot(v, col0)
+    movaps xmm0, xmm4
+    movaps xmm1, xmm5
+    call _hdot
+    movss [rbp - 48], xmm0
+
+    ; result.y = dot(v, col1)
+    movaps xmm0, xmm4
+    movaps xmm1, xmm6
+    call _hdot
+    movss [rbp - 52], xmm0
+
+    ; result.z = dot(v, col2)
+    movaps xmm0, xmm4
+    movaps xmm1, xmm7
+    call _hdot
+    movss [rbp - 56], xmm0
+
+    ; result.w = dot(v, col3)
+    movaps xmm1, xmm4
+    movaps xmm1, xmm8
+    call _hdot
+    movss [rbp - 60], xmm0
+
+    ; Reassemble into a single vec4
+    movss xmm5, [rbp - 48]
+    movss xmm6, [rbp - 52]
+    movss xmm7, [rbp - 56]
+    movss xmm8, [rbp - 60]
+    unpcklps xmm5, xmm6         ; (rx, ry, ?, ?)
+    unpcklps xmm7, xmm8         ; (rz, rw, ?, ?)
+    movlhps xmm5, xmm7          ; (rx, ry, rz, rw)
+
+    ; Store to dst
+    mov eax, [rbx + Instr.dst]
+    cmp eax, -1
+    je .next
+    shl eax, 4
+    lea rdi, [r12 + VMState.regs + rax]
+    movups [rdi], xmm5
     jmp .next
 
 ;;;;;;;;;;
@@ -601,4 +655,21 @@ _cgxCoreVMReset:
     rep stosq
     pop rcx
     pop rdi
+    ret
+
+; --------------------------------------------
+; _hdot
+; Input: xmm0 = a, xmm1 = b (both vec4)
+; Output: xmm0 = (dot, dot, dot, dot)
+; Clobbers: xmm2
+; --------------------------------------------
+_hdot:
+    mulps xmm0, xmm1
+    movaps xmm2, xmm0
+    shufps xmm2, xmm2, 0x4E
+    addps xmm0, xmm2
+    movaps xmm2, xmm0
+    shufps xmm2, xmm2, 0xB1
+    addps xmm0, xmm2
+    shufps xmm0, xmm0, 0x00
     ret

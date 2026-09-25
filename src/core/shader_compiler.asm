@@ -298,7 +298,22 @@ _compileAssign:
 
     mov byte [rel _ccDebugStage], 46
 
-    ; Emit MOV dest, source
+    mov eax, [r12 + ASTNode.c]
+
+    cmp eax, CGX_TOK_ASSIGN             ; ASSIGN
+    je .emitPlainAssign
+    cmp eax, CGX_TOK_PLUS_ASSIGN        ; PLUS_ASSIGN
+    je .emitAddAssign
+    cmp eax, CGX_TOK_MINUS_ASSIGN       ; MINUS_ASSIGN
+    je .emitSubAssign
+    cmp eax, CGX_TOK_STAR_ASSIGN        ; STAR_ASSIGN
+    je .emitMulAssign
+    cmp eax, CGX_TOK_SLASH_ASSIGN       ; SLASH_ASSIGN
+    je .emitDivAssign
+    
+    jmp .errRhsEmit
+
+.emitPlainAssign:
     mov ecx, CGX_OP_MOV
     mov edx, r14d
     mov r8d, r15d
@@ -306,11 +321,29 @@ _compileAssign:
     call _emit
     cmp eax, -1
     je .errRhsEmit
-
-    ; TODO: compund assignment not yet supported...
     xor eax, eax
     jmp .done
-
+.emitAddAssign:
+    mov ecx, CGX_OP_ADD
+    jmp .emitCompound
+.emitSubAssign:
+    mov ecx, CGX_OP_SUB
+    jmp .emitCompound
+.emitMulAssign:
+    mov ecx, CGX_OP_MUL
+    jmp .emitCompound
+.emitDivAssign:
+    mov ecx, CGX_OP_DIV
+.emitCompound:
+    mov edx, r14d
+    mov r8d, r14d
+    mov r9d, r15d
+    call _emit
+    cmp eax, -1
+    je .errRhsEmit
+    xor eax, eax
+    jmp .done
+    
 .errRhsExpr:
     mov eax, -1
     jmp .done

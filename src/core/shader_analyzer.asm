@@ -393,6 +393,99 @@ _cgxCoreAnalyze:
 ; Mask format: 4 bytes, each byte is a source index (0..3) or 0.
 ;;;;;;;;;;
 .typeMember:
+    mov eax, [rdi + ASTNode.a]
+    cmp eax, -1
+    je .memberVec4
+
+    mov ecx, eax
+    imul ecx, ASTNode_size
+    mov rsi, r12
+    add rsi, rcx
+    mov ecx, [rsi + ASTNode.typeId]
+
+    cmp ecx, CGX_TYPE_FLOAT         ; FLOAT
+    je .memberFloat
+    cmp ecx, CGX_TYPE_VEC2          ; VEC2
+    je .memberFromVec2
+    cmp ecx, CGX_TYPE_VEC3          ; VEC3
+    je .memberFromVec3
+    cmp ecx, CGX_TYPE_VEC4          ; VEC4
+    je .memberFromVec4
+
+    jmp .memberVec4
+
+.memberFloat:
+    mov dword [rdi + ASTNode.typeId], CGX_TYPE_FLOAT
+    jmp .nextNode
+.memberFromVec2:
+    mov eax, [rdi + ASTNode.b]
+    mov ecx, eax
+    shr ecx, 8
+    and ecx, 0xFF
+    test ecx, ecx
+    jnz .memberVec2
+
+    test eax, eax
+    jz .memberFloat
+    mov dword [rdi + ASTNode.typeId], CGX_TYPE_FLOAT
+    jmp .nextNode
+.memberVec2:
+    mov dword [rdi + ASTNode.typeId], CGX_TYPE_VEC2
+    jmp .nextNode
+.memberFromVec3:
+    mov eax, [rdi + ASTNode.b]
+    ; Check byte 2 *index 2 -- if non-zero, at least 3 components
+    mov ecx, eax
+    shr ecx, 16
+    and ecx, 0xFF
+    test ecx, ecx
+    jnz .memberVec3
+    
+    ; Check byte 1 -- if non-zero, exactly 2 components
+    mov ecx, eax
+    shr ecx, 8
+    and ecx, 0xFF
+    test ecx, ecx
+    jnz .memberVec2
+
+    test eax, eax
+    jz .memberFloat
+    
+    mov dword [rdi + ASTNode.typeId], CGX_TYPE_FLOAT
+    jmp .nextNode
+.memberVec3:
+    mov dword [rdi + ASTNode.typeId], CGX_TYPE_VEC3
+    jmp .nextNode
+.memberFromVec4:
+    mov eax, [rdi + ASTNode.b]
+
+    ; Check byte 3 -- 4 components.
+    mov ecx, eax
+    shr ecx, 24
+    and ecx, 0xFF
+    test ecx, ecx
+    jnz .memberVec4
+
+    mov ecx, eax
+    shr ecx, 16
+    and ecx, 0xFF
+    test ecx, ecx
+    jnz .memberVec3
+
+    mov ecx, eax
+    shr ecx, 8
+    and ecx, 0xFF
+    test ecx, ecx
+    jnz .memberVec2
+
+    ; Single component. Byte 0 encodes the index:
+    ;   index 0 (.x/.r) -> mask 0
+    ;   index 1 (.y/.g) -> mask 1
+    ;   index 2 (.z/.b) -> mask 2
+    ;   index 3 (.w/.a) -> mask 3
+    mov dword [rdi + ASTNode.typeId], CGX_TYPE_FLOAT
+    jmp .nextNode
+.memberVec4:
     mov dword [rdi + ASTNode.typeId], CGX_TYPE_VEC4
     jmp .nextNode
 
