@@ -31,7 +31,7 @@ CGXEnable:
     cmp ecx, CGX_BLEND          ; BLEND
     je .blend
     cmp ecx, CGX_TEXTURE_2D     ; TEXTURE_2D
-    je .texture2d
+    je .texture2D
 
     xor eax, eax
     ret
@@ -51,7 +51,7 @@ CGXEnable:
     mov eax, 1
     ret
 
-.texture2d:
+.texture2D:
     mov dword [rel _cgxCoreState + CGXState.texture2DEnabled], 1
     mov eax, 1
     ret
@@ -68,7 +68,7 @@ CGXDisable:
     cmp ecx, CGX_BLEND          ; BLEND
     je .blend
     cmp ecx, CGX_TEXTURE_2D     ; TEXTURE_2D
-    je .texture2d
+    je .texture2D
 
     xor eax, eax
     ret
@@ -88,7 +88,7 @@ CGXDisable:
     mov eax, 1
     ret
 
-.texture2d:
+.texture2D:
     mov dword [rel _cgxCoreState + CGXState.texture2DEnabled], 0
     mov eax, 1
     ret
