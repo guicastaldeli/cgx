@@ -41,7 +41,7 @@ _cgxCoreVMExecute:
     xor r15d, r15d          ; pc
 
 .execLoop:
-    cmp r15d, r15d
+    cmp r15d, r14d
     jge .done
 
     ; instruction ptr = instrs + pc * Instr_size
@@ -66,7 +66,7 @@ _cgxCoreVMExecute:
     je .opMov
 
     ; ADD
-    cmp CGX_OP_ADD
+    cmp eax, CGX_OP_ADD
     je .opAdd
 
     ; SUB
@@ -75,7 +75,7 @@ _cgxCoreVMExecute:
 
     ; MUL
     cmp eax, CGX_OP_MUL
-    je .opDiv
+    je .opMul
 
     ; DOT
     cmp eax, CGX_OP_DOT
@@ -247,7 +247,7 @@ _cgxCoreVMExecute:
     movss xmm7, xmm2
     shufps xmm7, xmm7, 0x00             ; A.x
     movss xmm0, xmm3
-    shufps xmm0, 0x55                   ; B.y
+    shufps xmm0, xmm0, 0x55             ; B.y
     mulss xmm7, xmm0                    ; A.x * B.y
 
     movss xmm0, xmm2
@@ -320,8 +320,9 @@ _cgxCoreVMExecute:
     movaps xmm5, xmm2
     shufps xmm5, xmm5, 0x4E
     addps xmm2, xmm5
+    movaps xmm5, xmm2
     shufps xmm5, xmm5, 0xB1
-    addps xmm2, xmm4
+    addps xmm2, xmm5
     sqrtss xmm2, xmm2
     call _storeDSplat
     jmp .next
@@ -490,11 +491,11 @@ _cgxCoreVMExecute:
 .opSwizzle:
     mov eax, [rbx + Instr.srcA]
     shl eax, 4
-    lea rsi, [r12 + VMSTate.regs + rax]
+    lea rsi, [r12 + VMState.regs + rax]
     movups xmm2, [rsi]
 
     ; mask byte 0 = component to broadcast
-    mov ecx, [rbx = Instr.srcB]
+    mov ecx, [rbx + Instr.srcB]
     and ecx, 0xFF
     
     ; Choose shuffle imm
@@ -506,7 +507,7 @@ _cgxCoreVMExecute:
     je .swz2
     ; Default: 3
     shufps xmm2, xmm2, 0xFF
-    jmp .swDone
+    jmp .swzDone
 
 .swz0:
     shufps xmm2, xmm2, 0x00
@@ -576,7 +577,7 @@ _storeD:
 ; Broadcasts xmm2.x to all channels and store into dst
 ; --------------------------------------------
 _storeDSplat:
-    shups xmm2, xmm2, 0x00
+    shufps xmm2, xmm2, 0x00
     jmp _storeD
 
 ; --------------------------------------------
