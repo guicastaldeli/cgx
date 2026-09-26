@@ -18,6 +18,8 @@ extern _cgxCoreBufferInit
 extern _cgxCoreDepthFree
 extern _cgxCoreMatrixInit
 extern _cgxCoreTextureInit
+extern _cgxCoreShaderInit
+extern _cgxCoreShaderShutdown
 extern MessageBoxA
 
 global CGXInit
@@ -90,6 +92,11 @@ CGXInit:
     test eax, eax
     jz .fail
 
+    ; Init shader pool
+    call _cgxCoreShaderInit
+    test eax, eax
+    jz .fail
+
     mov eax, 1
     jmp .done
 
@@ -128,8 +135,9 @@ CGXShutdown:
     mov rbp, rsp
     sub rsp, 32
 
-    call _cgxCoreFreeFramebuffer
-    call _cgxWin32DestroyWindow
+    call _cgxCoreShaderShutdown         ; Shader 
+    call _cgxCoreFreeFramebuffer        ; Framebuffer
+    call _cgxWin32DestroyWindow         ; Window
 
     mov rsp, rbp
     pop rbp
