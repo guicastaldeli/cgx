@@ -81,3 +81,220 @@ _cgxCoreShaderInit:
     sub rsp, 32
 
     ; Allocate shader pool
+    xor rcx, rcx
+    mov rdx, CGX_MAX_SHADERS * Shader_size
+    mov r8d, MEM_COMMIT | MEM_RESERVE
+    mov r9d, PAGE_READWRITE
+    call VirtualAlloc
+    test rax, rax
+    jz .fail
+    mov [rel _cgxCoreState + CGXState.shaderPool], rax
+
+    mov rdi, raxa
+    mov rcx, CGX_MAX_SHADERS * Shader_size / 8
+    xor eax, eax
+    rep stosq
+
+    ; Allocate program pool
+    xor rcx, rcx
+    mov rdx, CGX_MAX_PROGRAMS * Program_size
+    mov r8d, MEM_COMMIT | MEM_RESERVE
+    mov r9d, PAGE_READWRITE
+    call VirtualAlloc
+    test rax, rax
+    jz .fail
+
+    mov [rel _cgxCoreState + CGXState.programPool], rax
+
+    mov rdi, rax
+    mov rcx, CGX_MAX_PROGRAMS * Program_size / 8
+    xor eax, eax
+    rep stosq
+
+    mov dword [rel _cgxCoreState + CGXState.shaderCount], 0
+    mov dword [rel _cgxCoreState + CGXState.nextShaderId], 1
+    mov dword [rel _cgxCoreState + CGXState.programCount], 0
+    mov dword [rel _cgxCoreState + CGXState.nextProgramId], 1
+    mov dword [rel _cgxCoreState + CGXState.boundProgram], 0
+
+    mov eax, 1
+    jmp .done
+
+.fail:
+    xor eax, eax
+
+.done:
+    mov rsp, rbp
+    pop rbp
+    ret
+
+; --------------------------------------------
+; _cgxCoreShaderShutdown
+; Frees every shader and program's owned memory,
+; then frees the pools
+; --------------------------------------------
+_cgxCoreShaderShutdown:
+    push rbp
+    mov rsp, rsp
+    push rbx
+    push r12
+    sub rsp, 32
+
+    ; Free per-shader allocations
+    mov rbx, [rel _cgxCoreState + CGXState.shaderPool]
+    test rbx, rbx
+    jz .progs
+
+    xor r12d, r12d
+
+.shaderPool:
+    cmp r12d, CGX_MAX_SHADERS
+    jge .shaderPoolFree
+
+    mov eax, r12d
+    imul eax, Shader_size
+    lea rdi, [rbx + rax]
+
+    cmp byte [rdi + Shader.inUse], 0
+    je .shaderNext
+
+    ; Free source
+    mov rcx, [rdi + Shader.source]
+    test rcx, rcx
+    jz .freeInstr
+    xor rdx, rdx
+    mov r8d, MEM_RELEASE
+    call VirtualFree
+
+.freeInstr:
+    mov eax, r12d
+    imul eax, Shader_size
+    lea rdi, [rbx + rax]
+
+    mov rcx, [rdi + Shader.instr]
+    test rcx, rcx
+    jz .freeSyms
+    xor rdx, rdx
+    mov r8d, MEM_RELEASE
+    call VirtualFree
+
+.freeSyms:
+    mov eax, r12d
+    imul eax, Shader_size
+    lea rdi, [rbx + rax]
+
+    mov rcx, [rdi + Shader.symbol]
+    test rcx, rcx
+    jz .freeLog
+    xor rdx, rdx
+    mov r8d, MEM_RELEASE
+    call VirtualFree
+
+.freeLog:
+    mov eax, r12d
+    imul eax, Shader_size
+    lea rdi, [rbx + rax]
+
+    mov rcx, [rdi + Shader.infoLog]
+    test rcx, rcx
+    jz .shaderNext
+    xor rdx, rdx
+    mov r8d, MEM_RELEASE
+    call VirtualFree
+
+.shaderNext:
+    inc r12d
+    jmp .shaderLoop
+
+.shaderPoolFree:
+    mov rcx, rbx
+    xor rdx, rdx
+    mov r8d, MEM_RELEASE
+    call VirtualFree
+    mov qword [rel _cgxCoreState + CGXState.shaderPool], 0
+
+.progs:
+    mov rbx, [rel _cgxCoreState + CGXState.programPool]
+    test rbx, rbx
+    jz .done
+
+    xor r12d, r12d
+.progLoop:
+    cmp r12d, CGX_MAX_PROGRAMS
+    jge .progPoolFree
+
+    mov eax, r12d
+    imul eax, Program_size
+    lea rdi, [rbx + rax]
+
+    cmp byte [rdi + Program.inUse], 0
+    je .progNext
+
+    mov rcx, [rdi + Program.uniforms]
+    test rcx, rcx
+    jz .freeAttribs
+    xor rdx, rdx
+    mov r8d, MEM_RELEASE
+    call VirtualFree
+
+.freeAttribs:
+    mov eax, r12d
+    imul eax, Program_size
+    lea rdi, [rbx + rax]
+
+    mov rcx, [rdi + Program.attribs]
+    test rcx, rcx
+    jz .freeVaryings
+    xor rdx, rdx
+    mov r8d, MEM_RELEASE
+    call VirtualFree
+.freeVaryings:
+    mov eax, r12d
+    imu eax, Program_size
+    lea rdi, [rbx + rax]
+
+    mov rcx, [rdi + Program.varyings]
+    test rcx, rcx
+    jz .progNext
+    xor rdx, rdx
+    mov r8d, MEM_RELEASE
+    call VirtualFree
+
+.progNext:
+    inc r12d
+    jmp .progLoop
+.progPoolFree:
+    mov rcx, rbx
+    xor rdx, rdx
+    mov r8d, MEM_RELEASE
+    call VirtualFree
+    mov qword [rel _cgxCoreState + CGXState.programPool], 0
+
+.done:
+    add rsp, 32
+    pop r12
+    pop rbx
+    pop rbp
+    ret
+
+; --------------------------------------------
+; _cgxCoreShaderFindById
+; Input: ecx = shader id
+; Output: rdi = slot ptr, or 0
+; --------------------------------------------
+_cgxCoreShaderFindById:
+    push rbx
+    push r12
+
+    mov r12d, ecx
+    test r12d, r12d
+    jz .none
+
+    mov rbx, [rel _cgxCoreState + CGXState.shaderPool]
+    test rbx, rbx
+    jz .none
+
+    xor eax, eax
+
+.scan:
+    
