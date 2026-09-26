@@ -5,7 +5,7 @@
 ; Does NOT render. Executes:
 ;   - CGXCreateShader / CGXShaderSource / CGXCompileShader
 ;   - CGXCreateProgram / CGXAttachShader / CGXLinkProgram
-;   - CGXGetUniformLocation / CGXGetAttribLOcation
+;   - CGXGetUniformLocation / CGXGetAttribLocation
 ;   - CGXUniform4f writes into the vertex VM register file
 ;
 ; Each stage prints a MessageBox. If all stages show OK,
@@ -33,7 +33,7 @@ extern CGXAttachShader
 extern CGXLinkProgram
 extern CGXUseProgram
 extern CGXGetUniformLocation
-extern CGXGetAttribLOcation
+extern CGXGetAttribLocation
 extern CGXUniform4f
 
 extern _cgxCoreState
@@ -132,4 +132,213 @@ _write3digits:
     ret
 
 main:
-    
+    push rbp
+    mov rbp, rsp
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    sub rsp, 56
+
+    lea rdi, [rel msg_d0]
+    call _box
+
+    mov rcx, 800
+    mov rdx, 600
+    lea r8, [rel title]
+    call CGXInit
+    test eax, eax
+    jnz .initOk
+
+    lea rdx, [rel msg_fail_init]
+    call _box
+    jmp .fail
+
+.iniOk:
+    lea rdx, [rel msg_d1]
+    call _box
+
+    ; Vertex shader
+    mov ecx, CGX_VERTEX_SHADER
+    call CGXCreateShader
+    test eax, eax
+    jz .vsFail
+    mov [rel vsId], eax
+
+    lea rdi, [rel msg_d2 + 28]
+    call _write3digits
+    lea rdx, [rel msg_d2]
+    call _box
+
+    ; Srouce
+    mov ecx, [rel vsId]
+    lea rdx, [rel vsSrc]
+    mov r8d, vsSrcLen
+    call CGXShaderSource
+
+    ; Compile
+    lea rdi, [rel msg_d3 + 28]
+    mov eax, r12d
+    call _write3digits
+    lea rdx, [rel msg_d3]
+    call _bix
+
+    test r12d, r12d
+    jz .vscFail
+    jmp .vertexOk
+
+.vsFail:
+    lea rdx, [rel msg_fail_vs]
+    call _box
+    jmp .fail
+.vscFail:
+    lea rdx, [rel msg_fail_vsc]
+    call _box
+    jmp .fail
+.vertexOk:
+    ; Frag shader
+    mov ecx, CGX_FRAGMENT_SHADER
+    call CGXCreateShader
+    test eax, eax
+    jz .fsFail
+    mov [rel fsId], eax
+
+    mov ecx, [rel fsId]
+    lea rdx, [rel fsSrc]
+    mov r8d, fsSrcLen
+    call CGXShaderSource
+
+    mov ecx, [rel fsId]
+    call CGXCompileShader
+    test eax, eax
+    jz .fscFail
+    jmp .fragOk
+
+.fsFail:
+    lea rdx, [rel msg_fail_fs]
+    call _box
+    jmp .fail
+.fscFail:
+    lea rdx, [rel msg_fail_fsc]
+    call _box
+    jmp .fail
+.fragOk:
+    ; Program
+    call CGXCreateProgram
+    test eax, eax
+    jz .progFail
+    mov [rel progId], eax
+
+    mov ecx, [rel progId]
+    mov edx, [rel vsId]
+    call CGXAttachShader
+
+    mov ecx, [rel progId]
+    call CGXLinkProgram
+    mov r13d, eax
+
+    lea rdi, [rel msg_d4 + 28]
+    mov eax, r13d
+    call _write3digits
+    lea rdx, [rel msg_d4]
+    call _box
+
+    test r13d, r13d
+    jz .linkFail
+    jmp .linkOk
+
+.progFail:
+    lea rdx, [rel msg_fail_prog]
+    call _box
+    jmp .fail
+.linkFail:
+    lea rdx, [rel msg_fail_link]
+    call _box
+    jmp .fail
+.linkOk:
+    ; GetUniformLocation("uScale")
+    mov ecx, [rel progId]
+    lea rdx, [rel uScaleName]
+    call CGXGetUniformLocation
+    mov [rel uScaleLoc], eax
+
+    lea rdi, [rel msg_d5 + 32]
+    call _write3digits
+    lea rdx, [rel msg_d5]
+    call _box
+
+    cmp eax, 0
+    jge .ulocOk
+    lea rdx, [rel msg_fail_uloc]
+    call _box
+    jmp .fail
+
+.ulocOk:
+    ; GetAttribLocation("aPos")
+    mov ecx, [rel progId]
+    lea rdx, [rel aPosName]
+    call CGXGetAttribLocation
+    mov [rel aPosLoc], eax
+
+    lea rdi, [rel msg_d6 + 32]
+    call _write3digits
+    lea rdx, [rel msg_d6]
+    call _box
+
+    cmp eax, 0
+    jge .alocOk
+    lea rdx, [rel msg_fail_aloc]
+    call _box
+    jmp .fail
+.alocOk:
+    ; Write a uniform and read it back from vertex VM
+    ; CGXUniform4f(prog, "uScale", 0.5, 0.5, 0.5, 0.5)
+    ;
+    ; After writing, the register the analyzer assigned to uScale
+    ; in the vertex shader should contain (0.5, 0.5, 0.5, 0.5)
+    ; read .x, multiply by 100, turncate to int, and display.
+    ; Expected: 50.
+
+    mov ecx, [rel progId]
+    lea rdx, [rel uScalename]
+    mov eax, 0x3F000000         ; value: 0.5f
+    movd xmm0, eax
+    movaps xmm1, xmm0
+    movaps xmm2, xmm0
+    movaps xmm3, xmm0
+    call CGXUniform4f
+
+    ; Find uScale's register in the linked uniform table by
+    ; locating its entry through CGXGetUniformLocation's index.
+
+    lea rbx, [rel _cgxCoreState + CGXState.vertVM + VMState.regs + 2 * 16]
+    movss xmm0, [rbx]
+    mov eax, 0x42C80000         ; 100.0f
+    movd xmm1, eax
+    mulss xmm0, xmm1
+    cvttss2so eax, xmm0         ; expect 50
+
+    lea rdi, [rel msg_d7 + 33]
+    call _write3digits
+    lea rdx, [rel msg_d7]
+    call _box
+
+    ; Done
+    call CGXShutdown
+    xor eax, eax
+    jmp .finish
+
+.fail:
+    call CGXShutdown
+    mov eax, 1
+
+.finish:
+    add rsp, 56
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    pop rbp
+    ret

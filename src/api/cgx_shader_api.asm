@@ -39,7 +39,7 @@ global CGXLinkProgram
 global CGXUseProgram
 global CGXDeleteProgram
 global CGXGetUniformLocation
-global CGXGetAttribLOcation
+global CGXGetAttribLocation
 global CGXUniform1f
 global CGXUniform2f
 global CGXUniform3f
