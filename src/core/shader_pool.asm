@@ -1965,3 +1965,214 @@ _cgxCoreUniform1f:
     ; Broadcast f into all 4 components;
     ; the symbols reg layout will get 16 bytes written.
     shufps xmm0, xmm0, 0x00
+    movaps xmm1, xmm0
+    movaps xmm2, xmm0
+    movaps xmm3, xmm0
+    jmp _storeUniformRegs
+
+; --------------------------------------------
+; _cgxCoreUniform2f
+; Input: ecx = program id, rdx = name ptr, xmm0 = x, xmm1 = y
+; --------------------------------------------
+_cgxCoreUniform2f:
+    movaps xmm2, xmm0
+    movaps xmm3, xmm1
+    jmp _storeUniformRegs
+
+; --------------------------------------------
+; _cgxCoreUniform3f
+; Input: ecx = program id, rdx = name ptr, xmm0..xmm2 = x,y,z
+; --------------------------------------------
+_cgxCoreUniform3f:
+    xorps xmm3, xmm3
+    jmp _storeUniformRegs
+
+; --------------------------------------------
+; _cgxCoreUniform4f
+; Input: ecx = program id, rdx = name ptr, xmm0..xmm3
+; --------------------------------------------
+_cgxCoreUniform4f:
+    jmp _storeUniformRegs
+
+; --------------------------------------------
+; _cgxCoreUniform1i
+; Input: ecx = program id, rdx = name ptr, r8d = int
+; Convert int -> float, then delegate to Uniform1f
+; --------------------------------------------
+_cgxCoreUniform1i:
+    cvtsi2ss xmm0, xmm8
+    jmp _cgxCoreUniform1f
+
+; --------------------------------------------
+; _cgxCoreUniform3fv
+; Input: ecx = program id, rdx = name ptr, r8 = ptr to 3 floats
+; --------------------------------------------
+_cgxCoreUniform3fv:
+    test r8, r8
+    jz .skip
+    movss xmm0, [r8 + 0]
+    movss xmm1, [r8 + 4]
+    movss xmm2, [r8 + 8]
+    xorps xmm3, xmm3
+    jmp _storeUniformRegs
+
+.skip:
+    ret
+
+; --------------------------------------------
+; _cgxCoreUniform4fv
+; Input: ecx = program id, rdx = name ptr, r8 = ptr to 4 floats
+; --------------------------------------------
+_cgxCoreUniform4fv:
+    test r8, r8
+    jz .skip
+    movss xmm0, [r8 + 0]
+    movss xmm1, [r8 + 4]
+    movss xmm2, [r8 + 8]
+    movss xmm3, [r8 + 12]
+    jmp _storeUniformRegs
+
+.skip:
+    ret
+
+; --------------------------------------------
+; _cgxCoreUniformMatrix4fv
+; Input: ecx = program id, rdx = name ptr, r8 = ptr to 16 floats
+; Writes 16 floats into the 4 consecutive registers starting
+; at the uniforms assigned register. In the register file
+; each register holds one vec4. Following GLSL column-major convention,
+; the four columns of the matrix land in four consecutive registers.
+; --------------------------------------------
+_cgxCoreUniformMatrix4fv:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    sub rsp, 56
+
+    ; Save inputs up front
+    mov r12d, ecx               ; program id
+    mov r13, rdx                ; name ptr
+    mov [rbp - 48], 48          ; source ptr (16 floats)
+
+    ; Bail on null name or null source
+    test r13, r13
+    jz .done
+    cmp qword [rbp - 48], 0
+    je .done
+
+    ; Find the program
+    mov ecx, r12d
+    call _cgxCoreProgramFindByid
+    test rdi, rdi
+    jz .done
+    mov rbx, rdi                ; program ptr
+
+    ; Search the uniform table for the name
+    mov r14, [rbx + Program.uniforms]
+    mov r15d, [rbx + Program.uniformCount]
+    xor ecx, ecx                ; index
+
+.search:
+    cmp ecx, r15d
+    jge .done
+
+    ; entry ptr = uniforms + index * Uniform_size
+    mov eax, ecx
+    imul eax, Uniform_size
+    lea rdi, [r14 + rax]
+
+    ; Compare entry.name (32 bytes) against the query string,
+    ; stopping at either a null byte or 32 bytes
+    lea rsi, [rdi]              ; entry name
+    mov rdx, r13                ; query name
+    push rcx
+    mov ecx, 32
+
+.cmpName:
+    mov al, [rsi]
+    mov dl, [rdx]
+    cmp al, dl
+    jne .diff
+    test al, al
+    jz .found
+    inc rsi
+    inc rdx
+    dec ecx
+    jnz .cmpName
+    jmp .found
+
+.diff:
+    pop rcx
+    inc ecx
+    jmp .search
+
+.found:
+    pop rcx
+
+    ; Recompute entry pointer
+    mov eax, ecx
+    imul eax, Uniform_size
+    lea rdi, [r14 + rax]
+    mov [rbp - 56], rdi             ; save entry ptr for second write
+
+    ; Write to the vertex VM if vertReg != 0xFF
+    movzx ecx, byte [rdi + Uniform.vertReg]
+    cmp ecx, 0xFF
+    je .fragSide
+
+    ; dest = &_cgxCoreState.vertVM.regs + vertReg * 16
+    mov eax, ecx
+    shl eax, 4
+    lea rsi, [rel _cgxCoreState + CGXState.vertVM + VMState.regs]
+    add rsi, rax
+
+    mov rdi, rsi
+    mov rsi, [rbp - 48]             ; reload source ptr
+    call _copy16Floats
+
+.fragSide:
+    ; Write to the fragment VM if frag != 0xFF
+    mov rdi, [rbp - 56]             ; reload entry ptr
+    movzx ecx, byte [rdi + Uniform.fragReg]
+    cmp ecx, 0xFF
+    je .done
+
+    mov eax, ecx
+    shl eax, 4
+    lea rsi, [rel _cgxCoreState + CGXState.fragVM + VMState.regs]
+    add rsi, rax
+
+    mov rdi, rsi
+    mov rsi, [rbp - 48]             ; reload source ptr
+
+.done:
+    add rsp, 56
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    pop rbp
+    ret
+
+; --------------------------------------------
+; _copy16Floats
+; Copies 16 consecutive floats (64 bytes) from src to dst.
+; Input: rdi = dst, rsi = src
+; Uses SSE aligned loads where possible; falls back to
+; unaligned movups to avoid 16-byte alignment requirements.
+; --------------------------------------------
+_copy16Floats:
+    movups xmm0, [rsi + 0]
+    movups xmm1, [rsi + 16]
+    movups xmm2, [rsi + 32]
+    movups xmm3, [rsi + 48]
+    movups [rdi + 0], xmm0
+    movups [rdi + 16], xmm1
+    movups [rdi + 32], xmm2
+    movups [rdi + 48], xmm3
+    ret
