@@ -27,6 +27,7 @@ extern _cgxCoreUniform1i
 extern _cgxCoreUniform3fv
 extern _cgxCoreUniform4fv
 extern _cgxCoreUniformMatrix4fv
+extern _cgxCoreBindAttribLocation
 
 global CGXCreateShader
 global CGXShaderSource
@@ -48,6 +49,7 @@ global CGXUniform1i
 global CGXUniform3fv
 global CGXUniform4fv
 global CGXUniformMatrix4fv
+global CGXBindAttribLocation
 
 section .text
 
@@ -194,3 +196,10 @@ CGXUniform4fv:
 ; --------------------------------------------
 CGXUniformMatrix4fv:
     jmp _cgxCoreUniformMatrix4fv
+
+; --------------------------------------------
+; CGXBindAttribLocation
+; Input: ecx = program id, edx = slot, r8 = name ptr
+; --------------------------------------------
+CGXBindAttribLocation:
+    jmp _cgxCoreBindAttribLocation

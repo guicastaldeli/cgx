@@ -35,6 +35,7 @@ extern CGXUseProgram
 extern CGXGetUniformLocation
 extern CGXGetAttribLocation
 extern CGXUniform4f
+extern CGXBindAttribLocation
 
 extern _cgxCoreState
 extern CGXState
@@ -73,6 +74,7 @@ section .data
     msg_d5          db "D5: GetUniformLocation returned 000", 0
     msg_d6          db "D6: GetAttribLocation returned 000", 0
     msg_d7          db "D7: uniform reg value x100 = 000", 0
+    msg_pos         db "rebind aPos -> 000", 0
 
     msg_fail_init   db "FAIL: CGXInit returned 0", 0
     msg_fail_vs     db "FAIL: VS create returned 0", 0
@@ -300,6 +302,23 @@ main:
     call _box
     jmp .fail
 .alocOk:
+    ; Override aPos's slot to 3, verify GetAttribLocation reflects it
+    mov ecx, [rel progId]
+    mov edx, 3
+    lea r8, [rel aPosName]
+    call CGXBindAttribLocation
+
+    mov ecx, [rel progId]
+    lea rdx, [rel aPosName]
+    call CGXGetAttribLocation
+    mov [rel aPosLoc], eax
+
+    ; Display as "rebind aPos -> 000"
+    lea rdi, [rel msg_pos + 15]
+    call _write3digits
+    lea rdx, [rel msg_pos]
+    call _box
+    
     ; Write a uniform and read it back from vertex VM
     ; CGXUniform4f(prog, "uScale", 0.5, 0.5, 0.5, 0.5)
     ;

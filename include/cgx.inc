@@ -100,7 +100,8 @@ extern CGXLinkProgram
 extern CGXUseProgram
 extern CGXDeleteProgram
 extern CGXGetUniformLocation
-extern CGXGetAttribLOocation
+extern CGXBindAttribLocation
+extern CGXGetAttribLocation
 
 extern CGXUniform1f
 extern CGXUniform2f

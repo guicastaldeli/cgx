@@ -49,6 +49,7 @@ global _cgxCoreUniform4fv
 global _cgxCoreUniformMatrix4fv
 global _cgxCoreShaderFindById
 global _cgxCoreProgramFindById
+global _cgxCoreBindAttribLocation
 
 MEM_COMMIT                      equ 0x00001000
 MEM_RESERVE                     equ 0x00002000
@@ -2230,4 +2231,79 @@ _strcmp32:
     ret
 .no:
     or eax, 1
+    ret
+
+; --------------------------------------------
+; _cgxCoreBindAttribLocation
+; Input: ecx = program id, edx = slot, r8 = name ptr
+; Output: eax = 1 ok, 0 fail
+; --------------------------------------------
+_cgxCoreBindAttribLocation:
+    push rbp
+    mov rbp, rsp 
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    sub rsp, 40
+
+    mov r12d, ecx           ; program id
+    mov r13d, edx           ; slot
+    mov r14, r8             ; name ptr
+
+    test r14, r14
+    jz .fail
+    cmp r13d, 16
+    jae .fail
+
+    ; Find the program
+    mov ecx, r12d
+    call _cgxCoreProgramFindById
+    test rdi, rdi
+    jz .fail
+    mov rbx, rdi
+
+    ; Walk the attrib table looking for a name match
+    mov r15, [rbx + Program.attribs]
+    mov r12d, [rbx + Program.attribCount]
+    xor ecx, ecx
+
+.search:
+    cmp ecx, r12d
+    jge .fail
+
+    mov eax, ecx
+    imul eax, Symbol_size
+    lea rdi, [r15 + rax]
+    mov rsi, r14
+
+    push rcx
+    call _strcmp32
+    pop rcx
+    jz .found
+
+    inc ecx
+    jmp .search
+
+.found:
+    mov eax, ecx
+    imul eax, Symbol_size
+    lea rdi, [r15 + rax]
+    mov [rdi + Symbol.location], r13d
+
+    mov eax, 1
+    jmp .done
+
+.fail:
+    xor eax, eax
+
+.done:
+    add rsp, 40
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    pop rbp
     ret
