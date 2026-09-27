@@ -17,6 +17,10 @@ extern _cgxCoreDrawPixel
 extern _cgxCoreSetDepth
 extern _cgxCoreSetAlpha
 extern _cgxCoreSetUV
+extern _cgxCoreShaderFindById
+extern _cgxCoreProgramFindById
+extern _cgxCoreVMExecute
+extern _cgxCoreProgramCacheAttribSlots
 extern _matrixMultiply
 extern _matrixMultiplyVec4
 
@@ -128,12 +132,19 @@ _cgxCoreFetchVertex:
 
     ; Read index from EBO
     mov ebx, [r15 + rcx]        ; ebx = vertex index
+    mov [rbp - 8], ebx          ; save vertex index for shader path
+
+    ; Shader path? if boundProgram == 0, use fixed-function
+    mov eax, [rel _cgxCoreState + CGXState.boundProgram]
+    test eax, eax
+    jnz .shaderPath
 
     ; Vertex ptr = vbo + index * stride
     mov eax, [r14 + VAO.attribs + Attrib.stride]
     test eax, eax
     jnz .haveStride
     mov eax, 28
+
 .haveStride:
     imul eax, ebx
     mov rbx, r13
@@ -213,6 +224,15 @@ _cgxCoreFetchVertex:
     movss xmm0, [rbx + rcx + 4]
     movss [r12 + RasterVertex.v], xmm0
 
+    jmp .done
+
+.shaderPath:
+    mov rdi, r12        ; RasterVertex*
+    call _cgxCoreShaderFetchVertex
+    test eax, eax
+    jz .done
+
+.done:
     add rsp, 32
     pop r12
     pop rbx
@@ -737,6 +757,16 @@ _cgxCoreDrawElements:
     jz .done
     mov r14, rdi
 
+    ; If a shader program is bound, resolve attrib slots once
+    mov eax, [rel _cgxCoreState + CGXState.boundProgram]
+    test eax, eax
+    jz .fixedFunc
+    mov ecx, eax
+    call _cgxCoreProgramCacheAttribSlots
+    test eax, eax
+    jz .done
+
+.fixedFunc:
     ; --- Buffer id ---
     ; VBO id
     mov eax, [r14 + VAO.vbo]
@@ -897,6 +927,343 @@ _cgxCoreDrawElements:
     pop r15
     pop r14
     pop r13
+    pop r12
+    pop rbx
+    pop rbp
+    ret
+
+; --------------------------------------------
+; _cgxCoreShaderFetchVertex
+; Runs the vertex shader for one vertex.
+;
+; Input: rdi = destination RasterVertex*
+;       r13 = VBO data ptr
+;       r14 = VAO ptr
+;       [rbp - 8] = veryex index (set by caller)
+; Output: eax = 1 ok, 0 fail
+; --------------------------------------------
+_cgxCoreShaderFetchVertex:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    push r12
+    push r15
+    sub rsp, 56
+
+    mov r12, rdi                    ; RasterVertex*
+    mov [rbp - 48], r13             ; VBO
+    mov [rbp - 56], r14             ; VAO
+    mov eax, [rbp + 16]             ; caller's vertex index (rbp-8 in caller)
+
+    ; [rbp + 16] -> caller's rbp - 9 = rbp + 16 - 8 = rbp + 8
+    mov eax, [rbp + 8]              ; vertex index
+    mov [rbp - 60], eax             ; save vertex index
+
+    ; find the bound program
+    mov ecx, [rel _cgxCoreState + CGXState.boundProgram]
+    test ecx, ecx
+    jz .fail
+
+    call _cgxCoreProgramFindById
+    test rdi, rdi
+    jz .fail
+    mov r15, rdi                    ; program ptr
+    mov [rbp - 72], r15
+
+    ; zero VM registers 2..255 except uniforms
+    ; zero the bitmask
+    lea rdi, [rbp - 128]
+    mov rcx, 4
+    xor eax, eax
+    rep stosq
+
+    ; Mark uniform register in the bitmask
+    mov rsi, [r15 + Program.uniforms]
+    mov ecx, [r15 + Program.uniformCount]
+    xor edx, edx
+
+.uniformMark:
+    cmp edx, ecx
+    jge .maskDone
+
+    mov eax, edx
+    imul eax, Uniform_size
+    movzx eax, byte [rsi + rax + Uniform.vertReg]
+    cmp eax, 0xFF
+    je .nextUniform
+
+    ; set bit (eax) in bitmask at rbp-128
+    mov r8d, eax
+    shr r8d, 3                      ; byte index
+    mov r9d, eax
+    and r9d, 7                      ; bit index
+    mov r10d, 1
+    mov ecx, r9d
+    shl r10d, cl
+    lea rdi, [rbp - 128]
+    or byte [rdi + r8], r10b
+
+    ; restore ecx (uniformCount) which cl got clobbered
+    mov ecx, [r15 + Program.uniformCount]
+
+.nextUniform:
+    inc edx
+    jmp .uniformMark
+
+.maskDone:
+    lea rdi, [rbp - 128]
+    or byte [rdi + 0], 0x03         ; bit 0 and 1
+
+    ; Zero VM register 2..255 that aren't marked
+    lea rdi, [rel _cgxCoreState + CGXState.vertVM + VMState.regs]
+    xorps xmm0, xmm0
+    xor r8d, r8d                    ; reg = 0
+
+.zeroLoop:
+    cmp r8d, 256
+    jge .zeroDone
+    cmp r8d, 2
+    jl .zeroSkip
+
+    ; check bitmask
+    mov eax, r8d
+    shr eax, 3
+    mov r9d, r8d
+    and r9d, 7
+    mov r10d, 1
+    mov ecx, r9d
+    shl r10d, cl
+    lea rsi, [rbp - 128]
+    test byte [rsi + rax], r10b
+    jnz .zeroSkip
+
+    mov eax, r8d
+    shl eax, 4
+    movups [rdi + rax], xmm0
+
+.zeroSkip:
+    inc r8d
+    jmp .zeroLoop
+
+.zeroDone:
+    ; load attributes into VM registers
+    mov r15, [rbp - 72]
+    mov rsi, [r15 + Program.attribs]
+    mov ecx, [r15 + Program.attribCount]
+    xor r8d, r8d                ; attrib index
+
+.attribLoop:
+    cmp r8d, ecx
+    jge .attribDone
+
+    mov eax, r8d
+    imul eax, Symbol_size
+    lea rdi, [rsi + rax]        ; attrib entry
+
+    ; slot = entry.location
+    mov eax, [rdi + Symbol.location]
+    cmp eax, -1
+    je .attribNext
+    cmp eax, 16
+    jae .attribNext
+    mov [rbp - 76], eax         ; slot
+
+    ; reg = entry.reg
+    movzx r9d, byte [rdi + Symbol.reg]
+    mov [rbp - 80], r9d         ; VM reg
+
+    ; VAO attrib ptr
+    mov eax, [rbp - 76]
+    imul eax, Attrib_size
+    mov r10, [rbp - 56]         ; VAO
+    add r10, VAO.attribs
+    add r10, rax
+
+    cmp byte [r10 + Attrib.enabled], 0
+    je .attribNext
+
+    ; Vertex ptr = VBO + vertexIndex * stride + offset
+    mov eax, [r10 + Attrib.stride]
+    test eax, eax
+    jnz .haveStride
+    mov eax, 28
+
+.haveStride:
+    imul eax, [rbp - 60]        ; vertex index
+    mov r11, [rbp - 48]         ; VBO
+    add r11, rax
+    mov eax, [r10 + Attrib.offset]
+    add r11, rax
+
+    ; Zero the temp vec4 scratch at [rbp-96]
+    lea rdi, [rbp - 96]
+    xorps xmm0, xmm0
+    movups [rdi], xmm0
+
+    ; Load 'size' floats from r11 into the scratch, one at a time.
+    ; Components beyond 'size' stay 0.0
+    movzx edx, byte [r10 + Attrib.size]
+
+    cmp edx, 0
+    jle .storeVec
+
+    ; component 0
+    movss xmm1, [r11]
+    movss [rdi], xmm1
+
+    cmp edx, 2
+    jl .storeVec
+
+    ; component 1
+    movss xmm1, [r11 + 4]
+    movss [rdi + 4], xmm1
+
+    cmp edx, 3
+    jl .storeVec
+
+    ; component 2
+    movss xmm1, [r11 + 8]
+    movss [rdi + 8], xmm1
+
+    cmp edx, 4
+    jl .storeVec
+
+    ; component 3
+    movss xmm1, [r11 + 12]
+    movss [rdi + 12], xmm1
+
+.storeVec:
+    ; Copy temp vec4 into VM regs[reg]
+    mov r9d, [rbp - 80]
+    mov eax, r9d
+    shl eax, 4
+    lea rdi, [rel _cgxCoreState + CGXState.vertVM + VMState.regs]
+    add rdi, rax
+    lea rsi, [rbp - 96]
+    movups xmm0, [rsi]
+    movups [rdi], xmm0
+
+.attribNext:
+    inc r8d
+    ; restore attribCount
+    mov ecx, [r15 + Program.attribCount]
+    jmp .attribLoop
+.attribDone:
+    ; run the vertex VM
+    lea rcx, [rel _cgxCoreState + CGXState.vertVM]
+    mov rax, [r15 + Program.vertShader]
+    ; Find the vertex shader's instruction stream
+    push r15
+    mov ecx, eax
+    call _cgxCoreShaderFindById
+    pop r15
+    test rdi, rdi
+    jz .fail
+
+    mov rdx, [rdi + Shader.instr]
+    mov r8d, [rdi + Shader.instrCount]
+
+    lea rcx, [rel _cgxCoreState + CGXState.vertVM]
+    call _cgxCoreVMExecute
+
+    ; perspective divite on gl_Position (reg 0)
+    lea rdi, [rel _cgxCoreState + CGXState.vertVM + VMState.regs]
+    movss xmm0, [rdi + 0]               ; x
+    movss xmm1, [rdi + 4]               ; y
+    movss xmm2, [rdi + 8]               ; z
+    movss xmm3, [rdi + 12]              ; w
+
+    ; Check for w == 0
+    xorps xmm4, xmm4
+    ucomiss xmm3, xmm4
+    je .skipDivide
+
+    divss xmm0, xmm3
+    divss xmm1, xmm3
+    divss xmm2, xmm3
+
+.skipDivide:
+    ; xmm0=x_ndc, xmm1=y_ndc, xmm2=z_ndc
+
+    ; Convert to pixels
+    movss [rbp - 100], xmm1
+    movss [rbp - 104], xmm2
+
+    call _cgxCoreNdcToPixelX
+    mov [r12 + RasterVertex.px], eax
+
+    movss xmm0, [rbp - 100]
+    call _cgxCoreNdcToPixelY
+    mov [r12 + RasterVertex.py], eax
+
+    movss xmm0, [rbp - 104]
+    mov ecx, 0x3F800000
+    movd xmm1, ecx
+    addss xmm0, xmm1
+    mov ecx, 0x3F000000
+    movd xmm1, ecx
+    mulss xmm0, xmm1
+    movss [r12 + RasterVertex.z], xmm0
+
+    ; copy varyings into varyingVert[vertexIndex * 128]
+
+    ; For each linked varying copy the source register (in the vert VM)
+    ; into the destination slot in varyingVert
+    mov r15, [rbp - 72]
+    mov rsi, [r15 + Program.varyings]
+    mov ecx, [r15 + Program.varyingCount]
+    xor r8d, r8d
+
+    ; dest base = varyingVert + vertexIndex * 128
+    mov eax, [rbp - 60]             ; vertex index
+    shl eax, 7                      ; * 128
+    lea r9, [rel _cgxCoreState + CGXState.varyingVert]
+    add r9, rax
+    mov [rbp - 112], r9             ; save dest base
+
+.varyingLoop:
+    cmp r8d, ecx
+    jge .varyingDone
+    cmp r8d, 8                      ; hard cap
+    jge .varyingDone
+
+    mov eax, r8d
+    imul eax, Symbol_size
+    lea rdi, [rsi + rax]
+
+    ; source reg = entry.reg
+    movzx eax, byte [rdi + Symbol.reg]
+
+    ; source ptr = vertVM.regs + reg * 16
+    shl eax, 4
+    lea rdi, [rel _cgxCoreState + CGXState.vertVM + VMState.regs]
+    add rdi, rax
+
+    ; dest ptr = varyingVertBase + i * 16
+    mov eax, r8d
+    shl eax, 4
+    mov rsi, [rbp - 112]
+    add rsi, rax
+
+    movups xmm0, [rsi]
+    movups [rsi], xmm0
+
+    ; Restore varyingCount and varying table ptr
+    mov rsi, [r15 + Program.varyings]
+    mov ecx, [r15 + Program.varyingCount]
+
+    inc r8d
+    jmp .varyingLoop
+.varyingDone:
+    mov eax, 1
+    jmp .done
+
+.fail:
+    xor eax, eax
+
+.done:
+    add rsp, 56
+    pop r15
     pop r12
     pop rbx
     pop rbp

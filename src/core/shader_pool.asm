@@ -24,6 +24,7 @@ extern _cgxCoreLexerTokenize
 extern _cgxCoreParserParse
 extern _cgxCoreAnalyze
 extern _cgxCoreCompile
+extern _cgxCoreVAOFindBound
 
 global _cgxCoreShaderInit
 global _cgxCoreShaderShutdown
@@ -50,6 +51,7 @@ global _cgxCoreUniformMatrix4fv
 global _cgxCoreShaderFindById
 global _cgxCoreProgramFindById
 global _cgxCoreBindAttribLocation
+global _cgxCoreProgramCacheAttribSlots
 
 MEM_COMMIT                      equ 0x00001000
 MEM_RESERVE                     equ 0x00002000
@@ -2292,6 +2294,97 @@ _cgxCoreBindAttribLocation:
     lea rdi, [r15 + rax]
     mov [rdi + Symbol.location], r13d
 
+    mov eax, 1
+    jmp .done
+
+.fail:
+    xor eax, eax
+
+.done:
+    add rsp, 40
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    pop rbp
+    ret
+
+; --------------------------------------------
+; _cgxCoreProgramCacheAttribSlots
+; For each linked attribute in the program, look up its
+; VAO slots (Symbol.location) in the currently bound VAO
+; and veridy the slot is enabled. Caches the slot back
+; to Symbol.location for fast access during draw.
+;
+; Input: ecx = program id
+; Output: eax = 1 ok, 0 fail
+; --------------------------------------------
+_cgxCoreProgramCacheAttribSlots:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    sub rsp, 40
+
+    mov r12d, ecx
+
+    ; Find the program
+    mov ecx, r12d
+    call _cgxCoreProgramFindById
+    test rdi, rdi
+    jz .fail
+    mov rbx, rdi
+
+    ; Must be linked
+    cmp byte [rbx + Program.linkStatus], 0
+    je .fail
+
+    ; Get the bound VAO
+    call _cgxCoreVAOFindBound
+    test rdi, rdi
+    jz .fail
+    mov r13, rdi                ; VAO ptr
+
+    ; Walk the program's attrib table
+    mov r14, [rbx + Program.attribs]
+    mov r15d, [rbx + Program.attribCount]
+    xor ecx, ecx
+
+.attribLoop:
+    cmp ecx, r15d
+    jge .success
+
+    ; entry ptr
+    mov eax, ecx
+    imul eax, Symbol_size
+    lea rdi, [r14 + rax]
+    mov [rbp - 48], rdi         ; save entry
+    mov [rbp - 52], ecx         ; save index
+
+    ; Slot = Symbol.location
+    mov eax, [rdi + Symbol.location]
+    cmp eax, -1
+    je .fail
+    cmp eax, 16
+    jae .fail
+
+    ; Check the VAO slot is enabled
+    imul eax, Attrib_size
+    mov rdi, r13
+    add rdi, VAO.attribs
+    add rdi, rax
+    cmp byte [rdi + Attrib.enabled], 0
+    je .fail
+
+    mov ecx, [rbp - 52]
+    inc ecx
+    jmp .attribLoop
+
+.success:
     mov eax, 1
     jmp .done
 
