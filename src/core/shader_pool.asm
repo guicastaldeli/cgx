@@ -13,6 +13,7 @@ default rel
 
 extern VirtualAlloc
 extern VirtualFree
+extern MessageBoxA
 extern RtlCopyMemory
 
 extern _cgxCoreState
@@ -57,18 +58,51 @@ PAGE_READWRITE                  equ 0x04
 SHADER_SYMTAB_BYTES             equ CGX_MAX_SYMBOLS * Symbol_size           ; 5120
 SHADER_INSTR_BYTES              equ CGX_MAX_INSTRUCTIONS * Instr_size       ; 24576
 SHADER_INFO_LOG_BYTES           equ 1024                                    ; 1024
-SHADER_SRC_BYTES                equ CHX_MAX_SOURCE_LEN                      ; 16384
+SHADER_SRC_BYTES                equ CGX_MAX_SOURCE_LEN                      ; 16384
 
 PROG_UNIFORM_BYTES              equ CGX_MAX_UNIFORMS * Uniform_size         ; 64 * 40 = 2560
 PROG_ATTRIB_BYTES               equ CGX_MAX_ATTRIBS * Symbol_size           ; 16 * 40 = 640
 PROG_VARYING_BYTES              equ CGX_MAX_VARYINGS * Symbol_size          ; 8 * 40 = 320
 
+section .data
+    diag_tok                    db "lexer done", 0
+    diag_par                    db "parser done", 0
+    diag_ana                    db "analyze done", 0
+    diag_cmp                    db "compile done", 0
+    diag_after_copy             db "after instr copy", 0
+    diag_after_symtab           db "after symtab", 0
+    diag_before_log             db "before log write", 0
+    diag_after_log              db "after log write", 0
+    diag_link_a                 db "link: program found", 0
+    diag_link_b                 db "link: both shader ids present", 0
+    diag_link_c                 db "link: both shader ptrs found", 0
+    diag_link_d                 db "link: vert compiled", 0
+    diag_link_e                 db "link: frag compiled", 0
+    diag_force                  db "force pass", 0
+    diag_allocated              db "allocated tables", 0
+    diag_before_loop            db "before vs loop", 0
+    diag_vs_iter                db "vs iter", 0
+    diag_vs_uniform             db "vs uniform", 0
+    diag_vs_attrib              db "vs attrib", 0
+    diag_vs_varying             db "vs varying", 0
+    diag_bad_symtab             db "bad symtab", 0
+    diag_good_symtab            db "good symtab", 0
+
 section .bss
-    _soTokens                   resb CGX_MAX_TOKENS * Token_size
+    _spTokens                   resb CGX_MAX_TOKENS * Token_size
     _spAst                      resb CGX_MAX_AST_NODES * ASTNode_size
     _spInstrs                   resb CGX_MAX_INSTRUCTIONS * Instr_size
 
 section .text
+
+_diag:
+    sub rsp, 40
+    xor ecx, ecx
+    mov r8, rdx
+    xor r9d, r9d
+    call MessageBoxA
+    add rsp, 40
+    ret
 
 ; --------------------------------------------
 ; _cgxCoreShaderInit
@@ -90,7 +124,7 @@ _cgxCoreShaderInit:
     jz .fail
     mov [rel _cgxCoreState + CGXState.shaderPool], rax
 
-    mov rdi, raxa
+    mov rdi, rax
     mov rcx, CGX_MAX_SHADERS * Shader_size / 8
     xor eax, eax
     rep stosq
@@ -147,7 +181,7 @@ _cgxCoreShaderShutdown:
 
     xor r12d, r12d
 
-.shaderPool:
+.shaderLoop:
     cmp r12d, CGX_MAX_SHADERS
     jge .shaderPoolFree
 
@@ -183,7 +217,7 @@ _cgxCoreShaderShutdown:
     imul eax, Shader_size
     lea rdi, [rbx + rax]
 
-    mov rcx, [rdi + Shader.symbol]
+    mov rcx, [rdi + Shader.symbols]
     test rcx, rcx
     jz .freeLog
     xor rdx, rdx
@@ -250,7 +284,7 @@ _cgxCoreShaderShutdown:
     call VirtualFree
 .freeVaryings:
     mov eax, r12d
-    imu eax, Program_size
+    imul eax, Program_size
     lea rdi, [rbx + rax]
 
     mov rcx, [rdi + Program.varyings]
@@ -381,7 +415,7 @@ _findFreeShaderSlot:
     push rbx
     push r12
 
-    mov rbx [rel _cgxCoreState + CGXState.shaderPool]
+    mov rbx, [rel _cgxCoreState + CGXState.shaderPool]
     test rbx, rbx
     jz .none
 
@@ -487,7 +521,7 @@ _cgxCoreShaderCreate:
 
     ; Fill in fields
     mov eax, [rel _cgxCoreState + CGXState.nextShaderId]
-    mov [rdx + Shader.id], eax
+    mov [rbx + Shader.id], eax
     mov [rbx + Shader.type], r12d
     mov byte [rbx + Shader.inUse], 1
     mov byte [rbx + Shader.compileStatus], 0
@@ -529,7 +563,7 @@ _cgxCoreShaderSource:
     push r12
     push r13
     push r14
-    sub rsp, 40
+    sub rsp, 48
 
     mov r12d, ecx
     mov r13, rdx
@@ -601,7 +635,7 @@ _cgxCoreShaderSource:
     xor eax, eax
 
 .done:
-    add rsp, 40
+    add rsp, 48
     pop r14
     pop r13
     pop r12
@@ -627,6 +661,7 @@ _cgxCoreShaderCompile:
     sub rsp, 56
 
     mov r12d, ecx
+    mov [rbp - 72], r12d        ; save shader id
 
     ; Find shader
     mov ecx, r12d
@@ -690,6 +725,8 @@ _cgxCoreShaderCompile:
     test eax, eax
     jz .fail
     mov r14d, eax                   ; token count
+    ;lea rdx, [rel diag_tok]
+    ;call _diag
 
     ; Parse
     lea rcx, [rel _spTokens]
@@ -700,6 +737,8 @@ _cgxCoreShaderCompile:
     test eax, eax
     jz .fail
     mov r15d, eax                   ; AST count
+    ;lea rdx, [rel diag_par]
+    ;call _diag
 
     ; Analyze
     lea rcx, [rel _spAst]
@@ -708,6 +747,8 @@ _cgxCoreShaderCompile:
     call _cgxCoreAnalyze
     test eax, eax
     jz .fail
+    ;lea rdx, [rel diag_ana]
+    ;call _diag
 
     ; Compile
     lea rcx, [rel _spAst]
@@ -718,7 +759,18 @@ _cgxCoreShaderCompile:
     call _cgxCoreCompile
     test eax, eax
     jz .fail
+    cmp eax, CGX_MAX_INSTRUCTIONS
+    ja .fail
     mov r14d, eax                   ; instruction count
+    ;lea rdx, [rel diag_cmp]
+    ;call _diag
+
+    ; Reload
+    mov ecx, [rbp - 72]
+    call _cgxCoreShaderFindById
+    test rdi, rdi
+    jz .fail
+    mov rbx, rdi
 
     ; Allocate instruction buffer and copy
     xor rcx, rcx
@@ -736,7 +788,17 @@ _cgxCoreShaderCompile:
     imul r8, Instr_size
     call RtlCopyMemory
 
+    ;lea rdx, [rel diag_after_copy]
+    ;call _diag
+
     mov [rbx + Shader.instrCount], r14d
+
+    ; Reload
+    mov ecx, [rbp - 72]
+    call _cgxCoreShaderFindById
+    test rdi, rdi
+    jz .fail
+    mov rbx, rdi
 
     ; Allocate symbol table and copy
     xor rcx, rcx
@@ -750,17 +812,42 @@ _cgxCoreShaderCompile:
 
     mov rcx, rax
     mov rdx, [rel _parserState + ParseState.symtab]
+    test rdx, rdx
+    jz .noSyms
+
+    mov rcx, rax
     mov r8d, SHADER_SYMTAB_BYTES
     call RtlCopyMemory
+    jmp .symtabDone
 
-    mov dword [rbx + Shader.symbolCount], CGX_MAX_SYMBOL
+.noSyms:
+    mov rdi, rax
+    mov rcx, SHADER_SYMTAB_BYTES / 8
+    xor eax, eax
+    rep stosq
+
+.symtabDone:
+    ; Reload
+    mov ecx, [rbp - 72]
+    call _cgxCoreShaderFindById
+    test rdi, rdi
+    jz .fail
+    mov rbx, rdi
+
+    mov dword [rbx + Shader.symbolCount], CGX_MAX_SYMBOLS
 
     ; Success
     mov byte [rbx + Shader.compileStatus], 1
 
-    ; Write success log
+    ; Write log
     mov rdi, [rbx + Shader.infoLog]
+    test rdi, rdi
+    jz .skipLogWrite
     mov byte [rdi], 0
+
+.skipLogWrite:
+    ;lea rdx, [rel diag_after_log]
+    ;call _diag
 
     mov eax, 1
     jmp .done
@@ -768,7 +855,7 @@ _cgxCoreShaderCompile:
 .fail:
     ; Write a failure log (first char 'E')
     mov rdi, [rbx + Shader.infoLog]
-    test rdi, rdix
+    test rdi, rdi
     jz .noLog
     mov byte [rdi], 'E'
     mov byte [rdi + 1], 0
@@ -827,13 +914,13 @@ _cgxCoreShaderDelete:
     test rcx, rcx
     jz .f3
     xor rdx, rdx
-    mov r8d, MEM_RELEASe
+    mov r8d, MEM_RELEASE
     call VirtualFree
 .f3:
     mov rcx, [rbx + Shader.infoLog]
     test rcx, rcx
     jz .markFree
-    xor edx, rdx
+    xor rdx, rdx
     mov r8d, MEM_RELEASE
     call VirtualFree
 
@@ -891,7 +978,7 @@ _cgxCoreProgramCreate:
 
     ; Clear slot
     push rdi
-    mov rcx, Progam_size
+    mov rcx, Program_size
     xor eax, eax
     rep stosb
     pop rdi
@@ -933,8 +1020,8 @@ _cgxCoreProgramAttach:
     push rbp
     mov rbp, rsp
     push rbx
-    pop r12
-    pop r13
+    push r12
+    push r13
     sub rsp, 32
 
     mov r12d, ecx
@@ -994,7 +1081,7 @@ _cgxCoreProgramLink:
     push r13
     push r14
     push r15
-    sub rsp, 72
+    sub rsp, 88
 
     mov r12d, ecx
 
@@ -1006,6 +1093,9 @@ _cgxCoreProgramLink:
 
     mov byte [rbx + Program.linkStatus], 0
 
+    lea rdx, [rel diag_link_a]
+    call _diag
+
     ; Both shaders must be present
     mov r13d, [rbx + Program.vertShader]
     test r13d, r13d
@@ -1013,6 +1103,9 @@ _cgxCoreProgramLink:
     mov r14d, [rbx + Program.fragShader]
     test r14d, r14d
     jz .fail
+
+    lea rdx, [rel diag_link_b]
+    call _diag
 
     ; Look them up
     mov ecx, r13d
@@ -1025,13 +1118,10 @@ _cgxCoreProgramLink:
     call _cgxCoreShaderFindById
     test rdi, rdi
     jz .fail
-    mov r14, rdi                    ; fragment shader ptr
+    mov [rbp - 64], rdi             ; fragment shader ptr
 
-    ; Both must be compiled
-    cmp byte [r13 + Shader.compileStatus], 0
-    je .fail
-    cmp byte [r14 + Shader.compileStatus], 0
-    je .fail
+    lea rdx, [rel diag_link_c]
+    call _diag
 
     ; Allocate uniform table
     mov rcx, [rbx + Program.uniforms]
@@ -1039,9 +1129,21 @@ _cgxCoreProgramLink:
     jz .allocUniforms
     jz .allocUniforms
     xor rdx, rdx
-    mov r8d, MEM_RELEASe
+    mov r8d, MEM_RELEASE
     call VirtualFree
     mov qword [rbx + Program.uniforms], 0
+
+    ; Both must be compiled
+    cmp byte [r13 + Shader.compileStatus], 0
+    je .fail
+    lea rdx, [rel diag_link_d]
+    call _diag
+    mov rax, [rbp - 64]
+    cmp byte [rax + Shader.compileStatus], 0
+    je .fail
+
+    lea rdx, [rel diag_link_e]
+    call _diag
 
 .allocUniforms:
     xor rcx, rcx
@@ -1071,7 +1173,10 @@ _cgxCoreProgramLink:
     call VirtualAlloc
     test rax, rax
     jz .fail
-    mov [rbx + Program.varying], rax
+    mov [rbx + Program.varyings], rax
+
+    lea rdx, [rel diag_allocated]
+    call _diag
 
     ; Walk vertex shader symbols
     ; uniforms -> uniform table
@@ -1080,16 +1185,30 @@ _cgxCoreProgramLink:
     mov r14, [r13 + Shader.symbols]         ; vertex symbol table
     xor ecx, ecx                            ; index
 
-.vsLoopL
+    mov rax, r14
+    cmp rax, 0x10000
+    jb .badSymtab
+
+    lea rdx, [rel diag_good_symtab]
+    call _diag
+    xor ecx, ecx
+    jmp .vsLoop
+
+.badSymtab:
+    lea rdx, [rel diag_bad_symtab]
+    call _diag
+    jmp .vsDone
+
+.vsLoop:
     cmp ecx, CGX_MAX_SYMBOLS
     jge .vsDone
 
     ; symbol ptr
     mov eax, ecx
     imul eax, Symbol_size
-    lea rsi, [r15 + rax]
+    lea rsi, [r14 + rax]
     mov [rbp - 56], rsi                     ; save symbol ptr
-    mov [rbp - 60], ecx                     ; save index
+    mov [rbp - 68], ecx                     ; save index
 
     movzx eax, byte [rsi + Symbol.type]
     test al, al
@@ -1099,53 +1218,67 @@ _cgxCoreProgramLink:
 
     cmp eax, CGX_QUAL_UNIFORM           ; UNIFORM
     je .vsUniform
-    cmp eax, CGX_QUAL__ATTRIBUTE        ; ATTRIBUTE
+    cmp eax, CGX_QUAL_ATTRIBUTE        ; ATTRIBUTE
     je .vsAttrib
     cmp eax, CGX_QUAL_VARYING           ; VARYING
     je .vsVarying
     jmp .vsNext
 
 .vsUniform:
+    lea rdx, [rel diag_vs_uniform]
+    call _diag
+
     ; Add to uniform table with vertReg = symbol.reg, fragReg = 0xFF
     mov rsi, [rbp - 56]
     mov ecx, r12d                       ; (preserve program id...)
     call _addUniformFromSymbol
     jmp .vsNext
 .vsAttrib:
+    lea rdx, [rel diag_vs_attrib]
+    call _diag
+    
     mov rsi, [rbp - 56]
     mov ecx, r12d
     call _addAttribFromSymbol
     jmp .vsNext
 .vsVarying:
+    lea rdx, [rel diag_vs_varying]
+    call _diag
+
     mov rsi, [rbp - 56]
     mov ecx, r12d
     call _addVaryingFromSymbol
     jmp .vsNext
 
 .vsNext:
-    mov ecx, [rbp - 60]
+    mov ecx, [rbp - 68]
     inc ecx
     jmp .vsLoop
 .vsDone:
     ; Walk fragment shader symbols
-    mov r15, [r14 + Shader.symbols]
+    mov rax, [rbp - 64]
+    test rax, rax
+    jz .fsDone
+    mov r15, [rax + Shader.symbols]
+    test r15, r15
+    jz .fsDone
     xor ecx, ecx
 
 .fsLoop:
-    cmp eax, CGX_MAX_SYMBOLS
+    cmp ecx, CGX_MAX_SYMBOLS
     jge .fsDone
 
     mov eax, ecx
     imul eax, Symbol_size
     lea rsi, [r15 + rax]
     mov [rbp - 56], rsi
-    mov [rbp - 60], ecx
+    mov [rbp - 68], ecx
 
     movzx eax, byte [rsi + Symbol.type]
     test al, al
     jz .fsNext
 
-    movzx eax, byte [rsi + Symbol.qualifiter]
+    movzx eax, byte [rsi + Symbol.qualifier]
 
     cmp eax, CGX_QUAL_UNIFORM       ; UNIFORM
     je .fsUniform
@@ -1165,7 +1298,7 @@ _cgxCoreProgramLink:
     jmp .fsNext
 
 .fsNext:
-    mov ecx, [rbp - 60]
+    mov ecx, [rbp - 68]
     inc ecx
     jmp .fsLoop
 .fsDone:
@@ -1182,7 +1315,7 @@ _cgxCoreProgramLink:
 
     mov edx, eax
     imul edx, Uniform_size
-    mov [rdi + rdx + uniformlocation], eax
+    mov [rdi + rdx + Symbol.location], eax
 
     inc eax
     jmp .locUniform
@@ -1191,7 +1324,7 @@ _cgxCoreProgramLink:
     mov ecx, [rbx + Program.attribCount]
     xor eax, eax
 .locAttrib:
-    cmp eax, rcx
+    cmp eax, ecx
     jge .linkOk
 
     mov edx, eax
@@ -1211,7 +1344,7 @@ _cgxCoreProgramLink:
     xor eax, eax
 
 .done:
-    add rsp, 72
+    add rsp, 88
     pop r15
     pop r14
     pop r13
@@ -1237,7 +1370,7 @@ _addUniformFromSymbol:
 
     mov ecx, r14d
     call _cgxCoreProgramFindById
-    test rdi, rsi
+    test rdi, rdi
     jz .done
     mov rbx, rdi
 
@@ -1249,9 +1382,10 @@ _addUniformFromSymbol:
     mov eax, r12d
     imul eax, Uniform_size
     add rdi, rax
+    mov r12, rdi
 
     ; Copy name (32 bytes)
-    lea rdi, [r13 + Symbol.name]
+    lea rsi, [r13 + Symbol.name]
     mov ecx, 32
 
 .copyName:
@@ -1264,10 +1398,11 @@ _addUniformFromSymbol:
 
     ; rdi now points at .type
     mov al, [r13 + Symbol.type]
-    mov [rdi + Uniform.type], al
+    mov [r12 + Uniform.type], al
     mov al, [r13 + Symbol.reg]
-    mov byte [rdi + Uniform.fragReg], 0xFF
-    mov dword [rdi + Uniform.location], -1
+    mov [r12 + Uniform.vertReg], al
+    mov byte [r12 + Uniform.fragReg], 0xFF
+    mov dword [r12 + Uniform.location], -1
 
     inc dword [rbx + Program.uniformCount]
 
@@ -1298,7 +1433,7 @@ _addAttribFromSymbol:
     jz .done
     mov rbx, rdi
 
-    mov r12, [rbx + Program.attribCount]
+    mov r12d, [rbx + Program.attribCount]
     cmp r12d, CGX_MAX_ATTRIBS
     jge .done
 
@@ -1306,6 +1441,7 @@ _addAttribFromSymbol:
     mov eax, r12d
     imul eax, Symbol_size
     add rdi, rax
+    mov r12, rdi
 
     lea rsi, [r13 + Symbol.name]
     mov ecx, 32
@@ -1319,12 +1455,12 @@ _addAttribFromSymbol:
     jnz .copyName
 
     mov al, [r13 + Symbol.type]
-    mov [rdi + Symbol.type], al
+    mov [r12 + Symbol.type], al
     mov al, [r13 + Symbol.qualifier]
-    mov [rdi + Symbol.qualifier], al
+    mov [r12 + Symbol.qualifier], al
     mov al, [r13 + Symbol.reg]
-    mov [rdi + Symbol.reg], al
-    mov dword [rdi + Symbol.location], -1
+    mov [r12 + Symbol.reg], al
+    mov dword [r12 + Symbol.location], -1
 
     inc dword [rbx + Program.attribCount]
 
@@ -1353,7 +1489,7 @@ _addVaryingFromSymbol:
     jz .done
     mov rbx, rdi
 
-    mov r12d, [rbx + Program.varying]
+    mov r12d, [rbx + Program.varyingCount]
     cmp r12d, CGX_MAX_VARYINGS
     jge .done
 
@@ -1361,6 +1497,7 @@ _addVaryingFromSymbol:
     mov eax, r12d
     imul eax, Symbol_size
     add rdi, rax
+    mov r12, rdi
 
     lea rsi, [r13 + Symbol.name]
     mov ecx, 32
@@ -1374,12 +1511,12 @@ _addVaryingFromSymbol:
     jnz .copyName
 
     mov al, [r13 + Symbol.type]
-    mov [rdi + Symbol.type], al
+    mov [r12 + Symbol.type], al
     mov al, [r13 + Symbol.qualifier]
-    mov [rdi + Symbol.qualifier], al
+    mov [r12 + Symbol.qualifier], al
     mov al, [r13 + Symbol.reg]
-    mov [rdi + Symbol.reg], al
-    mov dword [rdi + Symbol.location], -1
+    mov [r12 + Symbol.reg], al
+    mov dword [r12 + Symbol.location], -1
 
     inc dword [rbx + Program.varyingCount]
 
@@ -1397,7 +1534,7 @@ _addVaryingFromSymbol:
 ; Otherwise, append a new entry with fragReg = symbol.reg
 ; and vertReg = 0xFF
 ; --------------------------------------------
-_mergeUniformSymbol:
+_mergeUniformFromSymbol:
     push rbx
     push r12
     push r13
@@ -1408,63 +1545,49 @@ _mergeUniformSymbol:
     mov r14d, ecx
 
     mov ecx, r14d
-    call _cgxCoreProgramInfoById
+    call _cgxCoreProgramFindById
     test rdi, rdi
     jz .done
-    mov rvx, rdi
+    mov rbx, rdi
 
     ; Search the uniform table for a name match
     mov r15, [rbx + Program.uniforms]
     mov r12d, [rbx + Program.uniformCount]
-    xor ecx, ecx
+    xor r10d, r10d
 
 .search:
-    cmp ecx, r12d
+    cmp r10d, r12d
     jge .notFound
 
-    mov eax, ecx
+    mov eax, r10d
     imul eax, Uniform_size
     lea rdi, [r15 + rax]
+    lea rsi, [r13 + Symbol.name]
+    call _strcmp32
+    jz .match
 
-    ; Compare names byte-by-byte (32 bytes each)
-    lea rdi, [r13 + Symbol.name]
-    push rcx
-    mov ecx, 32
+    inc r10d
+    jmp .search
 
-.cmpName:
-    mov al, [rdi]
-    mov dl, [rsi]
-    cmp al, dl
-    jne .diff
-    inc rdi
-    inc rsi
-    dec ecx
-    jnz .cmpName
-    pop rcx
-
-    ; Match found: update fragReg
-    ; rdi is now 32 bytes past the start of the entry
-    ; back up by 32 to reach the entry base
-    sub rdi, 32
+.match:
+    mov eax, r10d
+    imul eax, Uniform_size
+    lea rdi, [r15 + rax]
     mov al, [r13 + Symbol.reg]
     mov [rdi + Uniform.fragReg], al
     jmp .done
 
-.diff:
-    pop rcx
-    inc rcx
-    jmp .search
-
 .notFound:
     ; Append as a fragment-only uniform
     mov r12d, [rbx + Program.uniformCount]
-    cmp r12d, CGX_MAX_UNIFORM
+    cmp r12d, CGX_MAX_UNIFORMS
     jge .done
 
     mov rdi, [rbx + Program.uniforms]
     mov eax, r12d
     imul eax, Uniform_size
     add rdi, rax
+    mov r12, rdi
 
     lea rsi, [r13 + Symbol.name]
     mov ecx, 32
@@ -1478,11 +1601,11 @@ _mergeUniformSymbol:
     jnz .copyName
 
     mov al, [r13 + Symbol.type]
-    mov [rdi + Uniform.type], al
-    mov byte [rdi + Uniform.vertReg], 0xFF
+    mov [r12 + Uniform.type], al
+    mov byte [r12 + Uniform.vertReg], 0xFF
     mov al, [r13 + Symbol.reg]
-    mov [rdi + Uniform.fragRag], al
-    mov dword [rdi + Uniform.location], -1
+    mov [r12 + Uniform.fragReg], al
+    mov dword [r12 + Uniform.location], -1
 
     inc dword [rbx + Program.uniformCount]
 
@@ -1516,42 +1639,29 @@ _mergeVaryingFromSymbol:
 
     mov r15, [rbx + Program.varyings]
     mov r12d, [rbx + Program.varyingCount]
-    xor ecx, ecx
+    xor r10d, r10d
 
 .search:
-    cmp ecx, r12d
+    cmp r10d, r12d
     jge .notFound
 
-    mov eax, ecx
+    mov eax, r10d
     imul eax, Symbol_size
     lea rdi, [r15 + rax]
-
     lea rsi, [r13 + Symbol.name]
-    push rcx
-    mov ecx, 32
+    call _strcmp32
+    jz .match
 
-.cmpName;
-    mov al, [rdi]
-    mov dl, [rsi]
-    cmp al, dl
-    jne .diff
-    inc rdi
-    inc rsi
-    dec ecx
-    jnz .cmpName
-    pop rcx
+    inc r10d
+    jmp .search
 
-    ; Match ipdate reg with fragemnt side (overwrite vert reg)
-    
-    sub rdi, 32
-    mov al, [r12 + Symbol.reg]
+.match:
+    mov eax, r10d
+    imul eax, Symbol_size
+    lea rdi, [r15 + rax]
+    mov al, [r13 + Symbol.reg]
     mov [rdi + Symbol.reg], al
     jmp .done
-
-.diff:
-    pop rcx
-    inc ecx
-    jmp .search
 
 .notFound:
     ; Append as a fragment-only varying
@@ -1563,6 +1673,7 @@ _mergeVaryingFromSymbol:
     mov eax, r12d
     imul eax, Symbol_size
     add rdi, rax
+    mov r12, rdi
 
     lea rsi, [r13 + Symbol.name]
     mov ecx, 32
@@ -1576,12 +1687,12 @@ _mergeVaryingFromSymbol:
     jnz .copyName
 
     mov al, [r13 + Symbol.type]
-    mov [rdi + Symbol.type], al
+    mov [r12 + Symbol.type], al
     mov al, [r13 + Symbol.qualifier]
-    mov [rdi + Symbol.qualifier], al
+    mov [r12 + Symbol.qualifier], al
     mov al, [r13 + Symbol.reg]
-    mov [rdi + Symbol.reg], al
-    mov qword [rdi + Symbol.location], -1
+    mov [r12 + Symbol.reg], al
+    mov qword [r12 + Symbol.location], -1
 
     inc dword [rbx + Program.varyingCount]
 
@@ -1619,7 +1730,7 @@ _cgxCoreProgramUse:
 
 .failPop:
     pop rcx
-    xor eax, ax
+    xor eax, eax
     ret
 
 ; --------------------------------------------
@@ -1708,44 +1819,24 @@ _cgxCoreGetUniformLocation:
 
     mov r14, [rbx + Program.uniforms]
     mov r12d, [rbx + Program.uniformCount]
-    xor ecx, ecx
+    xor r10d, r10d
 
 .search:
-    cmp ecx, r12d
+    cmp r10d, r12d
     jge .fail
 
-    mov eax, ecx
+    mov eax, r10d
     imul eax, Uniform_size
-    lea rdi, [r14 + rax]
+    lea rdi, [r14 + rax]        ; entry
+    mov rsi, r13                ; query name
+    call _strcmp32
+    jz .found
 
-    lea rsi, [rdi]              ; name
-    mov rdi, r13                ; query
-    push rcx
-    mov ecx, 32
-
-.cmpName:
-    mov al, [rsi]
-    mov dl, [rdi]
-    cmp al, dl
-    jne .diff
-    test al, al
-    jnz .found
-    inc rsi,
-    inc rdi
-    dec ecx
-    jnz .cmpName
-
-    jmp .found
-
-.diff:
-    pop rcx
-    inc ecx
+    inc r10d
     jmp .search
 
 .found:
-    pop rcx
-    ; Recompute entry ptr
-    mov eax, ecx
+    mov eax, r10d
     imul eax, Uniform_size
     lea rdi, [r14 + rax]
     mov eax, [rdi + Uniform.location]
@@ -1786,42 +1877,24 @@ _cgxCoreGetAttribLocation:
 
     mov r14, [rbx + Program.attribs]
     mov r12d, [rbx + Program.attribCount]
-    xor ecx, ecx
+    xor r10d, r10d
 
 .search:
-    cmp ecx, r12d
+    cmp r10d, r12d
     jge .fail
 
-    mov eax, ecx
+    mov eax, r10d
     imul eax, Symbol_size
-    lea rdi, [r14 + rax]
-
-    lea rsi, [rdi]
-    mov rdi, r13
-    push rcx
-    mov ecx, 32
-
-.cmpName:
-    mov al, [rdi]
-    mov dl, [rdi]
-    cmp al, dl
-    jne .diff
-    test al, al
+    lea rdi, [r14 + rax]        ; entry
+    mov rsi, r13                ; query name
+    call _strcmp32
     jz .found
-    inc rsi
-    inc rdi
-    dec ecx
-    jnz .cmpName
-    jmp .found
 
-.diff:
-    pop rcx
-    inc ecx
+    inc r10d
     jmp .search
 
 .found:
-    pop rcx
-    mov eax, ecx
+    mov eax, r10d
     imul eax, Symbol_size
     lea rdi, [r14 + rax]
     mov eax, [rdi + Symbol.location]
@@ -1850,7 +1923,7 @@ _storeUniformRegs:
     push r12
     push r13
     push r14
-    sub rsp, 72
+    sub rsp, 80
 
     ; Save xmm values to stack
     movaps [rbp - 32], xmm0
@@ -1872,44 +1945,24 @@ _storeUniformRegs:
 
     mov r14, [rbx + Program.uniforms]
     mov r12d, [rbx + Program.uniformCount]
-    xor ecx, ecx
+    xor r10d, r10d
 
 .search:
-    cmp ecx, r12d
+    cmp r10d, r12d
     jge .done
 
-    mov eax, ecx
+    mov eax, r10d
     imul eax, Uniform_size
     lea rdi, [r14 + rax]
-
-    lea rsi, [rdi]
-    mov rdi, r13
-    push rcx
-    mov ecx, 32
-
-.cmpName:
-    mov al, [rsi]
-    mov dl, [rdi]
-    cmp al,dl
-    jne .diff
-    test al, al
+    mov rsi, r13
+    call _strcmp32
     jz .found
-    inc rsi
-    inc rdi
-    dec ecx
-    jnz .cmpName
-    jmp .found
 
-.diff:
-    pop rcx
-    inc ecx
+    inc r10d
     jmp .search
 
 .found:
-    pop rcx
-
-    ; Recompute entry ptr
-    mov eax, ecx
+    mov eax, r10d
     imul eax, Uniform_size
     lea rdi, [r14 + rax]
 
@@ -1922,14 +1975,10 @@ _storeUniformRegs:
     shl eax, 4
     lea rsi, [rel _cgxCoreState + CGXState.vertVM + VMState.regs]
     add rsi, rax
-    movaps xmm0, [rbp - 32]
-    movaps xmm1, [rbp - 48]
-    movaps xmm2, [rbp - 64]
-    movaps xmm3, [rbp - 80]
-    movaps [rsi], xmm0
-    movaps [rsi + 16], xmm1
-    movaps [rsi + 32], xmm2
-    movaps [rsi + 48], xmm3
+    unpcklps xmm0, xmm1
+    unpcklps xmm2, xmm3
+    movlhps xmm0, xmm2
+    movups [rsi], xmm0
 
 .frag:
     movzx ecx, byte [rdi + Uniform.fragReg]
@@ -1943,13 +1992,13 @@ _storeUniformRegs:
     movaps xmm1, [rbp - 48]
     movaps xmm2, [rbp - 64]
     movaps xmm3, [rbp - 80]
-    movaps [rsi], xmm0
-    movaps [rsi + 16], xmm1
-    movaps [rsi + 32], xmm2
-    movaps [rsi + 48], xmm3
+    unpcklps xmm0, xmm1
+    unpcklps xmm2, xmm3
+    movlhps xmm0, xmm2
+    movups [rsi], xmm0
 
 .done:
-    add rsp, 72
+    add rsp, 80
     pop r14
     pop r13
     pop r12
@@ -2000,7 +2049,7 @@ _cgxCoreUniform4f:
 ; Convert int -> float, then delegate to Uniform1f
 ; --------------------------------------------
 _cgxCoreUniform1i:
-    cvtsi2ss xmm0, xmm8
+    cvtsi2ss xmm0, r8d
     jmp _cgxCoreUniform1f
 
 ; --------------------------------------------
@@ -2056,7 +2105,7 @@ _cgxCoreUniformMatrix4fv:
     ; Save inputs up front
     mov r12d, ecx               ; program id
     mov r13, rdx                ; name ptr
-    mov [rbp - 48], 48          ; source ptr (16 floats)
+    mov [rbp - 48], r8          ; source ptr (16 floats)
 
     ; Bail on null name or null source
     test r13, r13
@@ -2066,7 +2115,7 @@ _cgxCoreUniformMatrix4fv:
 
     ; Find the program
     mov ecx, r12d
-    call _cgxCoreProgramFindByid
+    call _cgxCoreProgramFindById
     test rdi, rdi
     jz .done
     mov rbx, rdi                ; program ptr
@@ -2074,50 +2123,27 @@ _cgxCoreUniformMatrix4fv:
     ; Search the uniform table for the name
     mov r14, [rbx + Program.uniforms]
     mov r15d, [rbx + Program.uniformCount]
-    xor ecx, ecx                ; index
+    xor r10d, r10d                ; index
 
 .search:
-    cmp ecx, r15d
+    cmp r10d, r15d
     jge .done
 
-    ; entry ptr = uniforms + index * Uniform_size
-    mov eax, ecx
+    mov eax, r10d
     imul eax, Uniform_size
     lea rdi, [r14 + rax]
-
-    ; Compare entry.name (32 bytes) against the query string,
-    ; stopping at either a null byte or 32 bytes
-    lea rsi, [rdi]              ; entry name
-    mov rdx, r13                ; query name
-    push rcx
-    mov ecx, 32
-
-.cmpName:
-    mov al, [rsi]
-    mov dl, [rdx]
-    cmp al, dl
-    jne .diff
-    test al, al
+    mov rsi, r13
+    call _strcmp32
     jz .found
-    inc rsi
-    inc rdx
-    dec ecx
-    jnz .cmpName
-    jmp .found
 
-.diff:
-    pop rcx
-    inc ecx
+    inc r10d
     jmp .search
 
 .found:
-    pop rcx
-
-    ; Recompute entry pointer
-    mov eax, ecx
+    mov eax, r10d
     imul eax, Uniform_size
     lea rdi, [r14 + rax]
-    mov [rbp - 56], rdi             ; save entry ptr for second write
+    mov [rbp - 56], rdi
 
     ; Write to the vertex VM if vertReg != 0xFF
     movzx ecx, byte [rdi + Uniform.vertReg]
@@ -2148,6 +2174,7 @@ _cgxCoreUniformMatrix4fv:
 
     mov rdi, rsi
     mov rsi, [rbp - 48]             ; reload source ptr
+    call _copy16Floats
 
 .done:
     add rsp, 56
@@ -2175,4 +2202,32 @@ _copy16Floats:
     movups [rdi + 16], xmm1
     movups [rdi + 32], xmm2
     movups [rdi + 48], xmm3
+    ret
+
+; --------------------------------------------
+; _strcmp32
+; Input: rdi = a, rsi = b
+; Output: ZF=1 if equal up to 32 bytes or null terminator,
+; ZF=0 otherwise
+; Clobbers: rax, rcx
+; --------------------------------------------
+_strcmp32:
+    mov ecx,32
+
+.loop:
+    mov al, [rdi]
+    cmp al, [rsi]
+    jne .no
+    test al, al
+    jz .yes
+    inc rdi
+    inc rsi
+    dec ecx
+    jnz .loop
+
+.yes:
+    xor eax, eax
+    ret
+.no:
+    or eax, 1
     ret

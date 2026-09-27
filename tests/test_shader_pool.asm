@@ -62,7 +62,7 @@ section .data
     fsSrcLen equ $ - fsSrc - 1
 
     uScaleName      db "uScale", 0
-    aPosname        db "aPos", 0
+    aPosName        db "aPos", 0
 
     ; Messages
     msg_d0          db "D0: main entered", 0
@@ -141,7 +141,7 @@ main:
     push r15
     sub rsp, 56
 
-    lea rdi, [rel msg_d0]
+    lea rdx, [rel msg_d0]
     call _box
 
     mov rcx, 800
@@ -155,7 +155,7 @@ main:
     call _box
     jmp .fail
 
-.iniOk:
+.initOk:
     lea rdx, [rel msg_d1]
     call _box
 
@@ -166,7 +166,7 @@ main:
     jz .vsFail
     mov [rel vsId], eax
 
-    lea rdi, [rel msg_d2 + 28]
+    lea rdi, [rel msg_d2 + 29]
     call _write3digits
     lea rdx, [rel msg_d2]
     call _box
@@ -178,11 +178,15 @@ main:
     call CGXShaderSource
 
     ; Compile
-    lea rdi, [rel msg_d3 + 28]
+    mov ecx, [rel vsId]
+    call CGXCompileShader
+    mov r12d, eax
+
+    lea rdi, [rel msg_d3 + 30]
     mov eax, r12d
     call _write3digits
     lea rdx, [rel msg_d3]
-    call _bix
+    call _box
 
     test r12d, r12d
     jz .vscFail
@@ -235,6 +239,10 @@ main:
     call CGXAttachShader
 
     mov ecx, [rel progId]
+    mov edx, [rel fsId]
+    call CGXAttachShader
+
+    mov ecx, [rel progId]
     call CGXLinkProgram
     mov r13d, eax
 
@@ -281,7 +289,7 @@ main:
     call CGXGetAttribLocation
     mov [rel aPosLoc], eax
 
-    lea rdi, [rel msg_d6 + 32]
+    lea rdi, [rel msg_d6 + 31]
     call _write3digits
     lea rdx, [rel msg_d6]
     call _box
@@ -301,7 +309,7 @@ main:
     ; Expected: 50.
 
     mov ecx, [rel progId]
-    lea rdx, [rel uScalename]
+    lea rdx, [rel uScaleName]
     mov eax, 0x3F000000         ; value: 0.5f
     movd xmm0, eax
     movaps xmm1, xmm0
@@ -312,14 +320,20 @@ main:
     ; Find uScale's register in the linked uniform table by
     ; locating its entry through CGXGetUniformLocation's index.
 
-    lea rbx, [rel _cgxCoreState + CGXState.vertVM + VMState.regs + 2 * 16]
-    movss xmm0, [rbx]
+    mov rax, [rel _cgxCoreState + CGXState.programPool]
+    mov rcx, [rax + Program.uniforms]
+    movzx eax, byte [rcx + Uniform.vertReg]
+
+    shl eax, 4
+    lea rbx, [rel _cgxCoreState + CGXState.vertVM + VMState.regs]
+    movss xmm0, [rbx + rax]
+
     mov eax, 0x42C80000         ; 100.0f
     movd xmm1, eax
     mulss xmm0, xmm1
-    cvttss2so eax, xmm0         ; expect 50
+    cvttss2si eax, xmm0         ; expect 50
 
-    lea rdi, [rel msg_d7 + 33]
+    lea rdi, [rel msg_d7 + 29]
     call _write3digits
     lea rdx, [rel msg_d7]
     call _box
