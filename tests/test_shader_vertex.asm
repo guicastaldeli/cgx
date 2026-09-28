@@ -69,11 +69,11 @@ section .data
 
     ; Messages
     msg_d0          db "D0: main entered", 0
-    msg_d1          db "D1: CGXInit OK", 0
-    msg_d2          db "D2: VS compile failed", 0
-    msg_d3          db "D3: FS compile failed", 0
-    msg_d4          db "D4: link failed", 0
-    msg_d5          db "D5: draw returned", 0
+    msg_d1          db "D1: CGXInit 2OK", 0
+    msg_d2          db "VS compile failed", 0
+    msg_d3          db "FS compile failed", 0
+    msg_d4          db "link failed", 0
+    msg_d5          db "Success: draw returned", 0
 
     ; gl_Position dump
     ;  positions: x, y, z, w, each scaled by 1000 and sign-marked

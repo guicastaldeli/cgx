@@ -90,6 +90,9 @@ section .data
     diag_vs_varying             db "vs varying", 0
     diag_bad_symtab             db "bad symtab", 0
     diag_good_symtab            db "good symtab", 0
+        diag_attrib_enter      db "addAttrib: ENTER", 0
+    diag_attrib_beforecopy db "addAttrib: BEFORECOPY", 0
+    diag_attrib_done       db "addAttrib: DONE", 0
 
 section .bss
     _spTokens                   resb CGX_MAX_TOKENS * Token_size
@@ -728,8 +731,8 @@ _cgxCoreShaderCompile:
     test eax, eax
     jz .fail
     mov r14d, eax                   ; token count
-    ;lea rdx, [rel diag_tok]
-    ;call _diag
+    lea rdx, [rel diag_tok]
+    call _diag
 
     ; Parse
     lea rcx, [rel _spTokens]
@@ -740,8 +743,8 @@ _cgxCoreShaderCompile:
     test eax, eax
     jz .fail
     mov r15d, eax                   ; AST count
-    ;lea rdx, [rel diag_par]
-    ;call _diag
+    lea rdx, [rel diag_par]
+    call _diag
 
     ; Analyze
     lea rcx, [rel _spAst]
@@ -750,8 +753,8 @@ _cgxCoreShaderCompile:
     call _cgxCoreAnalyze
     test eax, eax
     jz .fail
-    ;lea rdx, [rel diag_ana]
-    ;call _diag
+    lea rdx, [rel diag_ana]
+    call _diag
 
     ; Compile
     lea rcx, [rel _spAst]
@@ -765,8 +768,8 @@ _cgxCoreShaderCompile:
     cmp eax, CGX_MAX_INSTRUCTIONS
     ja .fail
     mov r14d, eax                   ; instruction count
-    ;lea rdx, [rel diag_cmp]
-    ;call _diag
+    lea rdx, [rel diag_cmp]
+    call _diag
 
     ; Reload
     mov ecx, [rbp - 72]
@@ -791,8 +794,8 @@ _cgxCoreShaderCompile:
     imul r8, Instr_size
     call RtlCopyMemory
 
-    ;lea rdx, [rel diag_after_copy]
-    ;call _diag
+    lea rdx, [rel diag_after_copy]
+    call _diag
 
     mov [rbx + Shader.instrCount], r14d
 
@@ -849,8 +852,8 @@ _cgxCoreShaderCompile:
     mov byte [rdi], 0
 
 .skipLogWrite:
-    ;lea rdx, [rel diag_after_log]
-    ;call _diag
+    lea rdx, [rel diag_after_log]
+    call _diag
 
     mov eax, 1
     jmp .done
@@ -1130,7 +1133,6 @@ _cgxCoreProgramLink:
     mov rcx, [rbx + Program.uniforms]
     test rcx, rcx
     jz .allocUniforms
-    jz .allocUniforms
     xor rdx, rdx
     mov r8d, MEM_RELEASE
     call VirtualFree
@@ -1147,6 +1149,14 @@ _cgxCoreProgramLink:
 
     lea rdx, [rel diag_link_e]
     call _diag
+
+    mov rcx, [rbx + Program.uniforms]
+    test rcx, rcx
+    jz .allocUniforms
+    xor rdx, rdx
+    mov r8d, MEM_RELEASE
+    call VirtualFree
+    mov qword [rbx + Program.uniforms], 0
 
 .allocUniforms:
     xor rcx, rcx
@@ -1237,11 +1247,12 @@ _cgxCoreProgramLink:
     call _addUniformFromSymbol
     jmp .vsNext
 .vsAttrib:
+    mov rsi, [rbp - 56]
+    mov ecx, r12d
+    
     lea rdx, [rel diag_vs_attrib]
     call _diag
     
-    mov rsi, [rbp - 56]
-    mov ecx, r12d
     call _addAttribFromSymbol
     jmp .vsNext
 .vsVarying:

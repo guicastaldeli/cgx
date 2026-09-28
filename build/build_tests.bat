@@ -9,6 +9,24 @@ set SRC=%ROOT%\src
 set INC=%ROOT%\include
 set TESTS=%ROOT%\tests
 
+echo.
+echo ========================================
+echo Cleaning old build artifacts
+echo ========================================
+if exist "%BUILD%" (
+    echo [Clean] Deleting %BUILD%...
+    rmdir /s /q "%BUILD%"
+    if errorlevel 1 (
+        echo [ERROR] Failed to delete %BUILD%
+        pause
+        exit /b 1
+    )
+) else (
+    echo [Clean] Nothing to delete.
+)
+echo [Clean] Done.
+echo.
+
 call "%ROOT%\build\build.bat"
 if errorlevel 1 (
     echo [ERROR] CGX library build failed!
