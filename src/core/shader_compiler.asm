@@ -15,6 +15,7 @@ extern _cgxCoreState
 extern CGXState
 
 extern _parserState
+extern _cgxCoreParserGetArgPool
 
 global _cgxCoreCompile
 
@@ -375,7 +376,7 @@ _compileExpr:
     push r13
     push r14
     push r15
-    sub rsp, 40
+    sub rsp, 200
 
     mov byte [rel _ccDebugStage], 50
 
@@ -546,21 +547,25 @@ _compileExpr:
 ;;;;;;;;;;
 .exprCall:
     mov byte [rel _ccDebugStage], 63
-    mov eax, [r12 + ASTNode.a]
+    
+    ; type-keyword constructor
+    mov eax, [r12 + ASTNode.typeId]
+    cmp eax, CGX_TYPE_VEC4
+    je .callVec4
+    cmp eax, CGX_TYPE_VEC3
+    je .callVec3
+    cmp eax, CGX_TYPE_VEC2
+    je .callVec2
+    cmp eax, CGX_TYPE_MAT4
+    je .callMat4
 
-    ; token ptr = tokens + a * Token_size
+    ; normal named function
+    mov eax, [r12 + ASTNode.a]
     mov ecx, eax
     imul ecx, Token_size
     mov rsi, [rbp - 56]
     add rsi, rcx
-    mov r13, [rsi + Token.text]     ; function name
-
-    ; Compare with known names
-    mov rsi, r13
-    lea rdx, [rel _cf_vec4]
-    call _strEq
-    test eax, eax
-    jnz .callVec4
+    mov r13, [rsi + Token.text]
 
     mov rsi, r13
     lea rdx, [rel _cf_texture2D]
@@ -576,6 +581,13 @@ _compileExpr:
     je .errCallTemp
     jmp .done
 
+.callVec3:
+    jmp .errVec4Args
+.callVec2:
+    jmp .errVec4Args
+.callMat4:
+    jmp .errVec4Args
+
 .errCallTemp:
     mov byte [rel _ccDebugStage], 65
     jmp .fail
@@ -583,20 +595,397 @@ _compileExpr:
 ;;;;;;;;;;
 
 ;;;;;;;;;;
-; vec4(a, b)
+; vec4(...)
+; node.b = args pool base, node.c = arg count
+; Supports: 1 arg (scalar/vec2/vec3/vec4) or 4 args.
 ;;;;;;;;;;
 .callVec4:
     mov byte [rel _ccDebugStage], 66
 
-    ; TODO: parser must store arg node indices
+    mov r13d, [r12 + ASTNode.b]             ; args pool base
+    mov r14d, [r12 + ASTNode.c]             ; arg count
+
+    test r14d, r14d
+    jz .errVec4Args
+    cmp r14d, 4
+    jg .errVec4Args
+
+    ; Get args pool
+    call _cgxCoreParserGetArgPool
+    mov [rbp - 164], rax                     ; save args pool ptr
+
+    ; compile each argument, store results regs at [rbp - 108 + i * 4]
+    xor ebx, ebx
+
+.cv4CompileArgs:
+    cmp ebx, r14d
+    jge .cv4ArgsReady
+
+    mov eax, r13d
+    add eax, ebx
+    mov rsi, [rbp - 164]
+    mov eax, [rsi + rax * 4]                ; arg AST node index
+
+    mov rcx, [rbp - 48]                     ; ast
+    mov edx, eax
+    mov r8, [rbp - 56]                      ; tokens
+    call _compileExpr
+    cmp eax, -1
+    je .errVec4Args
+    
+    mov ecx, ebx
+    shl ecx, 2
+    lea rdi, [rbp - 108]
+    add rdi, rcx
+    mov [rdi], eax
+
+    inc ebx
+    jmp .cv4CompileArgs
+.cv4ArgsReady:
+    ; Allocate destination
     call _allocTemp
     cmp eax, -1
     je .errVec4Temp
-    jmp .done
+    mov [rbp - 124], eax                    ; dst arg
 
-.errVec4Temp:
+    cmp r14d, 1
+    je .cv4FromOne
+    cmp r14d, 2
+    je .cv4FromTwo
+    cmp r14d, 4
+    je .cv4FromFour
+    jmp .errVec4Args
+
+.cv4FromOne:
+    mov r10d, [rbp - 108]                   ; src reg
+    mov [rbp - 128], r10d
+
+    ; Look up arg's typeId
+    mov rsi, [rbp - 164]
+    mov eax, r13d
+    mov eax, [rsi + rax * 4]
+    imul eax, ASTNode_size
+    mov rsi, [rbp - 48]
+    add rsi, rax
+    mov eax, [rsi + ASTNode.typeId]
+
+    cmp eax, CGX_TYPE_FLOAT
+    je .cv4OneScalar
+    cmp eax, CGX_TYPE_VEC2
+    je .cv4OneVec2
+    cmp eax, CGX_TYPE_VEC3
+    je .cv4OneVec3
+    ; else: VEC4 or unknown -> plain copy
+    jmp .cv4OneCopy
+.cv4OneScalar:
+    mov ecx, CGX_OP_SPLAT
+    mov edx, [rbp - 124]
+    mov r8d, [rbp - 128]
+    xor r9d, r9d                            ; component 0
+    call _emit
+    cmp eax, -1
+    je .errVec4Emit
+    jmp .cv4Done
+.cv4OneCopy:
+    mov ecx, CGX_OP_MOV
+    mov edx, [rbp - 124]
+    mov r8d, [rbp - 128]
+    mov r9d, -1
+    call _emit
+    cmp eax, -1
+    je .errVec4Emit
+    jmp .cv4Done
+.cv4OneVec3:
+    ; dst = (v.x, v.y, v.z, 1.0)
+    ;  t2 = SPLAT v, 1
+    ;  t3 = SPLAT v, 2
+    ;  t1 = MOV imm 1.0
+    ;  PACK4 dst, v, t2, t3, t1
+    call _allocTemp
+    cmp eax, -1
+    je .errVec4Temp
+    mov [rbp - 132], eax                ; t2
+
+    call _allocTemp
+    cmp eax, -1
+    je .errVec4Temp
+    mov [rbp - 136], eax                ; t3
+
+    call _allocTemp
+    cmp eax, -1
+    je .errVec4Temp
+    mov [rbp - 140], eax                ; t1
+
+    ; t2 = splat v.y
+    mov ecx, CGX_OP_SPLAT
+    mov edx, [rbp - 132]
+    mov r8d, [rbp - 128]
+    mov r9d, 1
+    call _emit
+    cmp eax, -1
+    je .errVec4Emit
+
+    ; t3 = splat v.z
+    mov ecx, CGX_OP_SPLAT
+    mov edx, [rbp - 136]
+    mov r8d, [rbp - 128]
+    mov r9d, 2
+    call _emit
+    cmp eax, -1
+    je .errVec4Emit
+
+    ; t1 = (1.0, 1.0, 1.0, 1.0) via MOV-imm
+    mov ecx, CGX_OP_MOV
+    mov edx, [rbp - 140]
+    mov r8d, -1
+    mov r9d, 0x3F800000
+    call _emitImm
+    cmp eax, -1
+    je .errVec4Emit
+
+    ; PACK4 dst, v, t2, t3, t1
+    mov ecx, CGX_OP_PACK4
+    mov edx, [rbp - 124]
+    mov r8d, [rbp - 128]
+    mov r9d, [rbp - 132]
+    mov r10d, [rbp - 136]
+    mov r11d, [rbp - 140]
+    call _emit4
+    cmp eax, -1
+    je .errVec4Emit
+    jmp .cv4Done
+.cv4OneVec2:
+    ; dst = (v.x, v.y, 0, 1)
+    ;  t2 = SPLAT v, 1
+    ;  t3 = MOV imm 0.0
+    ;  t1 = MOV imm 1.0
+    ;  PACK4 dst, v, t2, t3, t1
+    call _allocTemp
+    cmp eax, -1
+    je .errVec4Temp
+    mov [rbp - 132], eax                ; t2
+
+    call _allocTemp
+    cmp eax, -1
+    je .errVec4Temp
+    mov [rbp - 136], eax                ; t3
+
+    call _allocTemp
+    cmp eax, -1
+    je .errVec4Temp
+    mov [rbp - 140], eax                ; t1
+
+    ; t2 = splat v.y
+    mov ecx, CGX_OP_SPLAT
+    mov edx, [rbp - 132]
+    mov r8d, [rbp - 128]
+    mov r9d, 1
+    call _emit
+    cmp eax, -1
+    je .errVec4Emit
+
+    ; t3 = 0.0
+    mov ecx, CGX_OP_MOV
+    mov edx, [rbp - 136]
+    mov r8d, -1
+    xor r9d, r9d
+    call _emitImm
+    cmp eax, -1
+    je .errVec4Emit
+
+    ; t1 = 1.0
+    mov ecx, CGX_OP_MOV
+    mov edx, [rbp - 140]
+    mov r8d, -1
+    mov r9d, 0x3F800000
+    call _emitImm
+    cmp eax, -1
+    je .errVec4Emit
+
+    ; PACK4 dst, v, t2, t3, t1
+    mov ecx, CGX_OP_PACK4
+    mov edx, [rbp - 124]
+    mov r8d, [rbp - 128]
+    mov r9d, [rbp - 132]
+    mov r10d, [rbp - 136]
+    mov r11d, [rbp - 140]
+    call _emit4
+    cmp eax, -1
+    je .errVec4Emit
+    jmp .cv4Done
+
+.cv4FromTwo:
+    mov r10d, [rbp - 108]               ; reg0
+    mov r11d, [rbp - 104]               ; reg1
+    mov [rbp - 128], r10d
+    mov [rbp - 132], r11d
+
+    mov rsi, [rbp - 164]
+    mov eax, r13d
+    mov eax, [rsi + rax * 4]
+    imul eax, ASTNode_size
+    mov rsi, [rbp - 48]
+    add rsi, rax
+    mov eax, [rsi + ASTNode.typeId]
+    mov [rbp - 136], eax                ; type0
+
+    mov rsi, [rbp - 164]
+    mov eax, r13d
+    inc eax
+    mov eax, [rsi + rax * 4]
+    imul eax, ASTNode_size
+    mov rsi, [rbp - 48]
+    add rsi, rax
+    mov eax, [rsi + ASTNode.typeId]
+    mov [rbp - 140], eax                ; type1
+
+    cmp dword [rbp - 136], CGX_TYPE_VEC3
+    jne .cv4TwoTryVec2Vec2
+    cmp dword [rbp - 140], CGX_TYPE_FLOAT
+    je  .cv4TwoVec3Scalar
+    jmp .errVec4Args
+
+.cv4TwoTryVec2Vec2:
+    cmp dword [rbp - 136], CGX_TYPE_VEC2
+    jne .errVec4Args
+    cmp dword [rbp - 140], CGX_TYPE_VEC2
+    jne .errVec4Args
+
+    ; --- vec2 + vec2 ---
+    ; tA = SPLAT reg0, 1
+    ; tB = SPLAT reg1, 0
+    ; tC = SPLAT reg1, 1
+    ; PACK4 dst, reg0, tA, tB, tC
+    call _allocTemp
+    cmp eax, -1
+    je .errVec4Temp
+    mov [rbp - 144], eax
+
+    call _allocTemp
+    cmp eax, -1
+    je .errVec4Temp
+    mov [rbp - 148], eax
+
+    call _allocTemp
+    cmp eax, -1
+    je .errVec4Temp
+    mov [rbp - 152], eax
+
+    mov ecx, CGX_OP_SPLAT
+    mov edx, [rbp - 144]
+    mov r8d, [rbp - 128]
+    mov r9d, 1
+    call _emit
+    cmp eax, -1
+    je .errVec4Emit
+
+    mov ecx, CGX_OP_SPLAT
+    mov edx, [rbp - 148]
+    mov r8d, [rbp - 132]
+    xor r9d, r9d
+    call _emit
+    cmp eax, -1
+    je .errVec4Emit
+
+    mov ecx, CGX_OP_SPLAT
+    mov edx, [rbp - 152]
+    mov r8d, [rbp - 132]
+    mov r9d, 1
+    call _emit
+    cmp eax, -1
+    je .errVec4Emit
+
+    mov ecx, CGX_OP_PACK4
+    mov edx, [rbp - 124]
+    mov r8d, [rbp - 128]
+    mov r9d, [rbp - 144]
+    mov r10d, [rbp - 148]
+    mov r11d, [rbp - 152]
+    call _emit4
+    cmp eax, -1
+    je .errVec4Emit
+    jmp .cv4Done
+.cv4TwoVec3Scalar:
+    ; --- vec3 + scalar ---
+    ; tA = SPLAT v3, 1
+    ; tB = SPLAT v3, 2
+    ; tC = SPLAT s,  0
+    ; PACK4 dst, v3, tA, tB, tC
+    call _allocTemp
+    cmp eax, -1
+    je .errVec4Temp
+    mov [rbp - 144], eax
+
+    call _allocTemp
+    cmp eax, -1
+    je .errVec4Temp
+    mov [rbp - 148], eax
+
+    call _allocTemp
+    cmp eax, -1
+    je .errVec4Temp
+    mov [rbp - 152], eax
+
+    mov ecx, CGX_OP_SPLAT
+    mov edx, [rbp - 144]
+    mov r8d, [rbp - 128]
+    mov r9d, 1
+    call _emit
+    cmp eax, -1
+    je .errVec4Emit
+
+     mov ecx, CGX_OP_SPLAT
+    mov edx, [rbp - 148]
+    mov r8d, [rbp - 128]
+    mov r9d, 2
+    call _emit
+    cmp eax, -1
+    je .errVec4Emit
+
+    mov ecx, CGX_OP_SPLAT
+    mov edx, [rbp - 152]
+    mov r8d, [rbp - 132]
+    xor r9d, r9d
+    call _emit
+    cmp eax, -1
+    je .errVec4Emit
+
+    mov ecx, CGX_OP_PACK4
+    mov edx, [rbp - 124]
+    mov r8d, [rbp - 128]
+    mov r9d, [rbp - 144]
+    mov r10d, [rbp - 148]
+    mov r11d, [rbp - 152]
+    call _emit4
+    cmp eax, -1
+    je .errVec4Emit
+    jmp .cv4Done
+
+.cv4FromFour:
+    mov ecx, CGX_OP_PACK4
+    mov edx, [rbp - 124]
+    mov r8d, [rbp - 108]
+    mov r9d, [rbp - 104]
+    mov r10d, [rbp - 100]
+    mov r11d, [rbp - 96]
+    call _emit4
+    cmp eax, -1
+    je .errVec4Emit
+    jmp .cv4Done
+
+.errVec4Args:
     mov byte [rel _ccDebugStage], 67
     jmp .fail
+.errVec4Temp:
+    mov byte [rel _ccDebugStage], 68
+    jmp .fail
+.errVec4Emit:
+    mov byte [rel _ccDebugStage], 69
+    jmp .fail
+
+.cv4Done:
+    mov eax, [rbp - 124]
+    jmp .done
 
 ;;;;;;;;;;
 
@@ -663,7 +1052,7 @@ _compileExpr:
     mov eax, -1
 
 .done:
-    add rsp, 40
+    add rsp, 200
     pop r15
     pop r14
     pop r13
@@ -754,6 +1143,44 @@ _emitImm:
 .done:
     pop r13
     pop r12
+    pop rbx
+    ret
+
+; --------------------------------------------
+; _emit4
+; Like _emit but with a 4th source operant written into Instr.pad0.
+; Input: ecx = op, edx = dst, r8d = srcA, r9d = srcB,
+;           [rsp + 4] = srcC, [rsp + 48] = srcD
+; Output: eax = 0 on success, -1 on fail
+; --------------------------------------------
+_emit4:
+    push rbx
+
+    ; Save caller args before we clobber
+    mov eax, [rel _ccInstrCount]
+    cmp eax, [rel _ccInstrCap]
+    jge .fail
+
+    mov ebx, eax
+    imul ebx, Instr_size
+    add rbx, [rel _ccInstrOut]
+
+    mov [rbx + Instr.op], ecx
+    mov [rbx + Instr.dst], edx
+    mov [rbx + Instr.srcA], r8d
+    mov [rbx + Instr.srcB], r9d
+    mov [rbx + Instr.srcC], r10d
+    mov [rbx + Instr.pad0], r11d
+
+    inc dword [rel _ccInstrCount]
+
+    xor eax, eax
+    jmp .done
+
+.fail:
+    mov eax, -1
+
+.done:
     pop rbx
     ret
 

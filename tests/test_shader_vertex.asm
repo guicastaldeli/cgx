@@ -68,7 +68,7 @@ section .data
     indices_size equ 3 * 4
 
     ; Messages
-    msg_d0          db "D0: main entered", 0
+    msg_d0          db "main entered", 0
     msg_d1          db "D1: CGXInit 2OK", 0
     msg_d2          db "VS compile failed", 0
     msg_d3          db "FS compile failed", 0

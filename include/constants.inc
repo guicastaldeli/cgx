@@ -205,6 +205,9 @@ CGX_OP_VEC4_MUL_MAT4                equ 14      ; dst = vec * mat
 CGX_OP_MAT4_MUL_MAT4                equ 15
 CGX_OP_NEG                          equ 16
 CGX_OP_SWIZZLE                      equ 17      ; packed into dst/srcA fields
+CGX_OP_PACK4                        equ 18      ; dst = (A.x, B.x, C.x, D.x)
+CGX_OP_SPLAT                        equ 19      ; dst = (A.i, A.i, A.i, A.i), i = src & 0xFF
+CGX_OP_MOVCOMP                      equ 20      ; dst[i] = A.j ; i = srcB & 0xFF, j = srcC & 0xFF      
 CGX_OP_HALT                         equ 255
 
 ; --- Shader/compiler limits ---
@@ -216,6 +219,7 @@ CGX_MAX_ARGS                        equ 16
 CGX_MAX_LOCALS                      equ 64
 CGX_MAX_SYMBOLS                     equ 128
 CGX_MAX_AST_NODES                   equ 512
+CGX_MAX_CALL_ARGS                   equ 512
 CGX_MAX_TOKENS                      equ 2048
 CGX_MAX_INSTRUCTIONS                equ 1024
 CGX_MAX_SOURCE_LEN                  equ 16384

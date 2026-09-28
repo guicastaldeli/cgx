@@ -234,6 +234,9 @@ _cgxCoreAnalyze:
 ; match agains built-in names, set typeId
 ;;;;;;;;;;
 .resolveCall:
+    cmp dword [rdi + ASTNode.typeId], 0
+    jne .nextNode
+     
     mov eax, [rdi + ASTNode.a]
     cmp eax, -1
     je .callDefault

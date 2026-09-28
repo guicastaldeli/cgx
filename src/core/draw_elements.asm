@@ -228,6 +228,7 @@ _cgxCoreFetchVertex:
 
 .shaderPath:
     mov rdi, r12        ; RasterVertex*
+    mov ecx, [rbp - 8]
     call _cgxCoreShaderFetchVertex
     test eax, eax
     jz .done
@@ -953,11 +954,11 @@ _cgxCoreShaderFetchVertex:
     mov r12, rdi                    ; RasterVertex*
     mov [rbp - 48], r13             ; VBO
     mov [rbp - 56], r14             ; VAO
-    mov eax, [rbp + 16]             ; caller's vertex index (rbp-8 in caller)
+    mov [rbp - 60], ecx            ; caller's vertex index (rbp-8 in caller)
 
     ; [rbp + 16] -> caller's rbp - 9 = rbp + 16 - 8 = rbp + 8
-    mov eax, [rbp + 8]              ; vertex index
-    mov [rbp - 60], eax             ; save vertex index
+    ;mov eax, [rbp + 8]              ; vertex index
+    ;mov [rbp - 60], eax             ; save vertex index
 
     ; find the bound program
     mov ecx, [rel _cgxCoreState + CGXState.boundProgram]

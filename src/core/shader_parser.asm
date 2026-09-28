@@ -16,6 +16,8 @@ global _cgxCoreParserParse
 global _cgxCoreParserFindSymbol
 global _cgxCoreParserAddSymbol
 global _cgxCoreParserGetErrorPos
+global _cgxCoreParserGetArgPool
+global _cgxCoreParserGetArgBase
 global _cgxDebugQual
 global _cgxDebugType
 global _cgxDebugQualTable
@@ -61,6 +63,10 @@ section .data
 section .bss
     _parserState            resb ParseState_size
     _parserSymtab           resb CGX_MAX_SYMBOLS * Symbol_size
+    _parserArgsPool         resb CGX_MAX_CALL_ARGS * 4
+    _parserArgsTop          resd 1
+    _parserRegCounter       resb 1
+
 section .text
 
 _cgxDebugQual:
@@ -110,6 +116,7 @@ _cgxCoreParserParse:
     sub rsp, 40
 
     lea rbx, [rel _parserState]
+    mov byte [rel _parserRegCounter], 1
 
     mov [rbx + ParseState.tokens], rcx
     mov [rbx + ParseState.tokenCount], edx
@@ -128,6 +135,8 @@ _cgxCoreParserParse:
     mov rcx, CGX_MAX_SYMBOLS * Symbol_size / 8
     xor eax, eax
     rep stosq
+
+    mov dword [rel _parserArgsTop], 0
 
     ; Parse
     mov rdi, rbx
@@ -295,7 +304,7 @@ _cgxCoreParserFindSymbol:
 
 .cmpLoop:
     test ecx, ecx
-    jz .namesMaybeMatch
+    jz .lengthMatch
     mov al, [rsi]
     mov dl, [rdi]
     cmp al, dl
@@ -304,12 +313,11 @@ _cgxCoreParserFindSymbol:
     inc rdi
     dec ecx
     jmp .cmpLoop
-.namesMaybeMatch:
-    mov al, [rdi]
+.lengthMatch:
+    mov al, [rsi]
     test al, al
     jnz .next
 
-    ; Match
     mov eax, r15d
     jmp .done
 .next:
@@ -385,7 +393,11 @@ _cgxCoreParserAddSymbol:
     pop r9
     mov [rdx + Symbol.type], r14b
     mov [rdx + Symbol.qualifier], r9b
-    mov byte [rdx + Symbol.reg], 0
+
+    movzx eax, byte [rel _parserRegCounter]
+    mov [rdx + Symbol.reg], al
+    inc byte [rel _parserRegCounter]
+
     mov dword [rdx + Symbol.location], -1
 
     mov eax, r15d
@@ -1495,15 +1507,19 @@ _parseFactor:
 .callSuffix:
     call _advance
     mov rdi, rbx
-
-    call _parseArgsPlaceholder
+    call _parseCallArgs
+    cmp eax, -1
+    je .err
+    mov r13d, eax
+    mov r14d, edx
 
     mov rdi, CGX_NODE_CALL
     call _allocNode
     cmp eax, -1
     je .err
     mov [rdx + ASTNode.a], r12d
-    mov dword [rdx + ASTNode.b], 0
+    mov [rdx + ASTNode.b], r13d
+    mov [rdx + ASTNode.c], r14d
     mov r12d, eax
     jmp .suffixLoop
 
@@ -1524,18 +1540,28 @@ _parseFactor:
     ret
 
 ; --------------------------------------------
-; _placeArgsPlaceholder
-; Stub -- parses 'expr (, expr)*' and discards, return 1
+; _parseCallArgs
+; Parses 'expr (, expr)*' until ')' and records
+; each argument's AST node index into _parserArgsPool.
+;
 ; Input: rdi = ParseState ptr
-; Output: eax = 1 on success
+; Output: eax = argsPool base index, -1 on error
+;       edx = argument count
 ; --------------------------------------------
-_parseArgsPlaceholder:
+_parseCallArgs:
     push rbp
     mov rbp, rsp
     push rbx
+    push r12
+    push r13
     sub rsp, 32
 
-    mov rbx, rdi
+    mov rbx, rdi                ; ParseState
+
+    ; Reserve a starting slot
+    mov eax, [rel _parserArgsTop]
+    mov r12d, eax               ; base
+    xor r13d, r13d              ; count
 
 .argLoop:
     call _peek
@@ -1550,6 +1576,16 @@ _parseArgsPlaceholder:
     cmp eax, -1
     je .err
 
+    ; Store arg node index in pool
+    mov ecx, [rel _parserArgsTop]
+    cmp ecx, CGX_MAX_CALL_ARGS
+    jge .err
+
+    lea rsi, [rel _parserArgsPool]
+    mov [rsi + rcx*4], eax
+    inc dword [rel _parserArgsTop]
+    inc r13d
+
     call _peek
     mov ecx, [rax + Token.type]
     cmp ecx, CGX_TOK_COMMA
@@ -1557,19 +1593,24 @@ _parseArgsPlaceholder:
     cmp ecx, CGX_TOK_RPAREN
     je .argsDone
     jmp .err
+
 .argSkip:
     call _advance
     jmp .argLoop
 .argsDone:
-    call _advance       ; Console ')'
-    mov eax, 1
+    call _advance               ; consume ')'
+    mov eax, r12d
+    mov edx, r13d
     jmp .done
 
 .err:
-    xor eax, eax
+    mov eax, -1
+    xor edx, edx
 
 .done:
     add rsp, 32
+    pop r13
+    pop r12
     pop rbx
     pop rbp
     ret
@@ -1585,6 +1626,8 @@ _parsePrimary:
     push rbx
     push r12
     push r13
+    push r14
+    push r15
     sub rsp, 40
 
     mov rbx, rdi
@@ -1654,16 +1697,21 @@ _parsePrimary:
     call _tokenIsTypeKeyword
     cmp eax, -1
     je .err
+    mov r15d, eax
+
     call _advance
     call _peek
     mov ecx, [rax + Token.type]
     cmp ecx, CGX_TOK_LPAREN
     jne .err
 
-    ; Parse args as placeholder
     call _advance
     mov rdi, rbx
-    call _parseArgsPlaceholder
+    call _parseCallArgs
+    cmp eax, -1
+    je .err
+    mov r13d, eax
+    mov r14d, edx
 
     ; CALL node
     mov rdi, CGX_NODE_CALL
@@ -1671,7 +1719,9 @@ _parsePrimary:
     cmp eax, -1
     je .err
     mov dword [rdx + ASTNode.a], 0
-    mov dword [rdx + ASTNode.b], 0
+    mov [rdx + ASTNode.b], r13d
+    mov [rdx + ASTNode.c], r14d
+    mov [rdx + ASTNode.typeId], r15d
     jmp .done
 
 .err:
@@ -1681,8 +1731,26 @@ _parsePrimary:
 
 .done:
     add rsp, 40
+    pop r15
+    pop r14
     pop r13
     pop r12
     pop rbx
     pop rbp
+    ret
+
+; --------------------------------------------
+; _cgxCoreParserGetArgPool
+; Output: rax = pointer to args pool
+; --------------------------------------------
+_cgxCoreParserGetArgPool:
+    lea rax, [rel _parserArgsPool]
+    ret
+    
+; --------------------------------------------
+; _cgxCoreParserGetArgBase
+; Output: eax = current top (used for validation)
+; --------------------------------------------
+_cgxCoreParserGetArgBase:
+    mov eax, [rel _parserArgsTop]
     ret

@@ -121,6 +121,18 @@ _cgxCoreVMExecute:
     cmp eax, CGX_OP_SWIZZLE
     je .opSwizzle
 
+    ; PACK 4
+    cmp eax, CGX_OP_PACK4
+    je .opPack4
+
+    ; SPLAT
+    cmp eax, CGX_OP_SPLAT
+    je .opSplat
+
+    ; MOVCOMP
+    cmp eax, CGX_OP_MOVCOMP
+    je .opMovComp
+
     ; Unknown op -- skip
     jmp .next
 
@@ -576,6 +588,106 @@ _cgxCoreVMExecute:
     jmp .next
 
 ;;;;;;;;;;
+
+;;;;;;;;;;
+; PACK4
+; dst = (A.x, B.x, C.x, D.x)
+; A = srcA, B = srcB, C = srcC, D = pad0
+;;;;;;;;;;
+.opPack4:
+    mov eax, [rbx + Instr.srcA]
+    shl eax, 4
+    movss xmm0, [r12 + VMState.regs + rax + 0]
+
+    mov eax, [rbx + Instr.srcB]
+    shl eax, 4
+    movss xmm1, [r12 + VMState.regs + rax + 0]
+
+    mov eax, [rbx + Instr.srcC]
+    shl eax, 4
+    movss xmm2, [r12 + VMState.regs + rax + 0]
+
+    mov eax, [rbx + Instr.pad0]
+    shl eax, 4
+    movss xmm3, [r12 + VMState.regs + rax + 0]
+
+    unpcklps xmm0, xmm1
+    unpcklps xmm2, xmm3
+    movlhps xmm0, xmm2
+
+    mov eax, [rbx + Instr.dst]
+    cmp eax, -1
+    je .next
+    shl eax, 4
+    movups [r12 + VMState.regs + rax], xmm0
+    jmp .next
+
+;;;;;;;;;;;
+
+;;;;;;;;;;;
+; SPLAT
+; dst = broadcast(srcA[srcB & 0x3])
+;;;;;;;;;;;
+.opSplat:
+    mov eax, [rbx + Instr.srcA]
+    shl eax, 4
+    lea rsi, [r12 + VMState.regs + rax]
+    movups xmm2, [rsi]
+
+    mov ecx, [rbx + Instr.srcB]
+    and ecx, 3
+
+    cmp ecx, 0
+    je .sp0
+    cmp ecx, 1
+    je .sp1
+    cmp ecx, 2
+    je .sp2
+    shufps xmm2, xmm2, 0xFF
+    jmp .spDone
+
+.sp0:
+    shufps xmm2, xmm2, 0x00
+    jmp .spDone
+.sp1:
+    shufps xmm2, xmm2, 0x55
+    jmp .spDone
+.sp2:
+    shufps xmm2, xmm2, 0xAA
+.spDone:
+    call _storeD
+    jmp .next
+
+;;;;;;;;;;;
+
+;;;;;;;;;;;
+; MOVCOMP
+; dst[srcB & 0x3] = srcA[srcC & 0x3]
+;;;;;;;;;;;
+.opMovComp:
+    mov eax, [rbx + Instr.dst]
+    cmp eax, -1
+    je .next
+    shl eax, 4
+    lea rdi, [r12 + VMState.regs + rax]
+
+    mov eax, [rbx + Instr.srcA]
+    shl eax, 4
+    lea rsi, [r12 + VMState.regs + rax]
+
+    mov ecx, [rbx + Instr.srcB]
+    and ecx, 3
+    mov edx, [rbx + Instr.srcC]
+    and edx, 3
+
+    ; Index into source lane
+    movss xmm0, [rsi + rdx * 4]
+
+    ; Index into dest lane
+    movss [rdi + rcx * 4], xmm0
+    jmp .next
+
+;;;;;;;;;;;
 
 .next:
     inc r15d
