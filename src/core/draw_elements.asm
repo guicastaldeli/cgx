@@ -21,6 +21,9 @@ extern _cgxCoreShaderFindById
 extern _cgxCoreProgramFindById
 extern _cgxCoreVMExecute
 extern _cgxCoreProgramCacheAttribSlots
+extern _cgxCoreShaderFindById
+extern _cgxCoreVMExecute
+extern _cgxCoreProgramFindById
 extern _matrixMultiply
 extern _matrixMultiplyVec4
 
@@ -132,7 +135,7 @@ _cgxCoreFetchVertex:
 
     ; Read index from EBO
     mov ebx, [r15 + rcx]        ; ebx = vertex index
-    mov [rbp - 8], ebx          ; save vertex index for shader path
+    mov [rbp - 24], ebx         ; save vertex index for shader path
 
     ; Shader path? if boundProgram == 0, use fixed-function
     mov eax, [rel _cgxCoreState + CGXState.boundProgram]
@@ -228,7 +231,7 @@ _cgxCoreFetchVertex:
 
 .shaderPath:
     mov rdi, r12        ; RasterVertex*
-    mov ecx, [rbp - 8]
+    mov ecx, [rbp - 24]
     call _cgxCoreShaderFetchVertex
     test eax, eax
     jz .done
@@ -622,7 +625,7 @@ _cgxCoreRasterTriangle:
     jle .bDone
     mov r10d, 255
 .bDone:
-    ; Pack
+    ; Pack color (fixed-function path)
     mov ecx, r8d
     shl ecx, 16
     mov edx, r9d
@@ -630,16 +633,22 @@ _cgxCoreRasterTriangle:
     or ecx, edx
     or ecx, r10d
 
-    push r12
-    push r13
-    call _cgxCoreSetColor
-
     ; Save barycentric weights
     movss [rbp - 112], xmm0
     movss [rbp - 116], xmm2
     movss [rbp - 120], xmm4
 
+    ; Shader path
+    mov eax, [rel _cgxCoreState + CGXState.boundProgram]
+    test eax, eax
+    jnz .fragShaderPath
+
+    call _cgxCoreSetColor
+
     ; Interpolate Z
+    movss xmm0, [rbp - 112]
+    movss xmm2, [rbp - 116]
+    movss xmm4, [rbp - 120]
     movss xmm5, [r14 + RasterVertex.z + 0]
     mulss xmm5, xmm0
     movss xmm6, [r14 + RasterVertex.z + RasterVertex_size]
@@ -648,16 +657,15 @@ _cgxCoreRasterTriangle:
     movss xmm6, [r14 + RasterVertex.z + RasterVertex_size * 2]
     mulss xmm6, xmm4
     addss xmm5, xmm6
-
     movaps xmm0, xmm5
     call _cgxCoreSetDepth
 
-    ; Restore barycentric weights
+    ; Restore weights
     movss xmm0, [rbp - 112]
     movss xmm2, [rbp - 116]
     movss xmm4, [rbp - 120]
 
-    ; Interpolate alpha
+     ; Interpolate alpha
     mov eax, [r14 + RasterVertex.a + 0]
     cvtsi2ss xmm5, eax
     mulss xmm5, xmm0
@@ -669,15 +677,13 @@ _cgxCoreRasterTriangle:
     cvtsi2ss xmm6, eax
     mulss xmm6, xmm4
     addss xmm5, xmm6
-
-    ; Convert 0-255 to 0.0-1.0
     mov eax, 0x3B808081
     movd xmm1, eax
     mulss xmm5, xmm1
-
     movaps xmm0, xmm5
     call _cgxCoreSetAlpha
 
+    ; Restore weights
     movss xmm0, [rbp - 112]
     movss xmm2, [rbp - 116]
     movss xmm4, [rbp - 120]
@@ -704,17 +710,52 @@ _cgxCoreRasterTriangle:
     addss xmm5, xmm6
     movss [rbp - 128], xmm5
 
-    ; Pass to state
     movss xmm0, [rbp - 124]
     movss xmm1, [rbp - 128]
     call _cgxCoreSetUV
 
-    ; Draw
+    jmp .doDraw
+
+.fragShaderPath:
+    ; Shader path
+    movss xmm0, [rbp - 112]
+    movss xmm1, [rbp - 116]
+    movss xmm2, [rbp - 120]
+
+    mov eax, [rel _cgxCoreState + CGXState.boundProgram]
+    mov ecx, eax
+    call _cgxCoreProgramFindById
+    test rdi, rdi
+    jz .doDraw
+
+    call _cgxCoreInterpolateVaryings
+
+    ; Interpolate Z for depth
+    movss xmm0, [rbp - 112]
+    movss xmm1, [rbp - 116]
+    movss xmm2, [rbp - 120]
+    movss xmm5, [r14 + RasterVertex.z + 0]
+    mulss xmm5, xmm0
+    movss xmm6, [r14 + RasterVertex.z + RasterVertex_size]
+    mulss xmm6, xmm1
+    addss xmm5, xmm6
+    movss xmm6, [r14 + RasterVertex.z + RasterVertex_size * 2]
+    mulss xmm6, xmm2
+    addss xmm5, xmm6
+    movaps xmm0, xmm5
+    call _cgxCoreSetDepth
+
+    mov eax, [rel _cgxCoreState + CGXState.boundProgram]
+    mov ecx, eax
+    call _cgxCoreProgramFindById
+    test rdi, rdi
+    jz .doDraw
+    call _cgxCoreRunFragmentShader
+
+.doDraw:
     mov ecx, r13d
     mov edx, r12d
     call _cgxCoreDrawPixel
-    pop r13
-    pop r12
 
 .nextCol:
     inc r13d
@@ -972,13 +1013,10 @@ _cgxCoreShaderFetchVertex:
     mov [rbp - 72], r15
 
     ; zero VM registers 2..255 except uniforms
-    ; zero the bitmask
-    lea rdi, [rbp - 128]
-    mov rcx, 4
-    xor eax, eax
-    rep stosq
+    lea rdi, [rel _cgxCoreState + CGXState.vertVM]
+    mov rsi, r15
+    call _cgxCoreInitVMRegs
 
-    ; Mark uniform register in the bitmask
     mov rsi, [r15 + Program.uniforms]
     mov ecx, [r15 + Program.uniformCount]
     xor edx, edx
@@ -1047,7 +1085,6 @@ _cgxCoreShaderFetchVertex:
     jmp .zeroLoop
 
 .zeroDone:
-    ; load attributes into VM registers
     mov r15, [rbp - 72]
     mov rsi, [r15 + Program.attribs]
     mov ecx, [r15 + Program.attribCount]
@@ -1247,7 +1284,7 @@ _cgxCoreShaderFetchVertex:
     mov rsi, [rbp - 112]
     add rsi, rax
 
-    movups xmm0, [rsi]
+    movups xmm0, [rdi]
     movups [rsi], xmm0
 
     ; Restore varyingCount and varying table ptr
@@ -1266,6 +1303,368 @@ _cgxCoreShaderFetchVertex:
 .done:
     add rsp, 128
     pop r15
+    pop r12
+    pop rbx
+    pop rbp
+    ret
+
+; --------------------------------------------
+; _cgxCoreInitVMRegs
+; Zero registers 2..255 of a VMState, skipping uniform registers
+; and the two built-in output registers (0 and 1)
+;
+; Input: rdi = VMState ptr
+;       rsi = Program ptr (whose uniform table to consult)
+; Output: eax = 1 ok, 0 fail
+;
+; Uses [rbp-128 .. rbp-96] as a 256-bit bitmask.
+; --------------------------------------------
+_cgxCoreInitVMRegs:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    sub rsp, 152
+
+    mov r12, rdi            ; VMState
+    mov r13, rsi            ; Program
+
+    ; Zero the bitmask
+    lea rdi, [rbp - 128]
+    mov rcx, 4
+    xor eax, eax
+    rep stosq
+
+    ; mark uniform registers (both vertReg and fragReg)
+    mov rsi, [r13 + Program.uniforms]
+    mov ecx, [r13 + Program.uniformCount]
+    xor edx, edx            ; uniform index
+
+.uniformMask:
+    cmp edx, ecx
+    jge .maskDone
+
+    ; entry ptr = uniforms + index * Uniform_size
+    mov eax, edx
+    imul eax, Uniform_size
+    lea rdi, [rsi + rax]
+
+    ; mark vertReg
+    movzx eax, byte [rdi + Uniform.vertReg]
+    cmp eax, 0xFF
+    je .skipVert
+    mov r8d, eax
+    shr r8d, 3
+    mov r9d, eax
+    and r9d, 7
+    mov r10d, 1
+    push rcx
+    mov ecx, r9d
+    shl r10d, cl
+    pop rcx
+    lea rbx, [rbp - 128]
+    or byte [rbx + r8], r10b
+
+.skipVert:
+    ; mark fragRag
+    movzx eax, byte [rdi + Uniform.fragReg]
+    cmp eax, 0xFF
+    je .nextUniform
+    mov r8d, eax
+    shr r8d, 3
+    mov r9d, eax
+    and r9d, 7
+    mov r10d, 1
+    push rcx
+    mov ecx, r9d
+    shl r10d, cl
+    pop rcx
+    lea rbx, [rbp - 128]
+    or byte [rbx + r8], r10b
+
+.nextUniform:
+    inc edx
+    jmp .uniformMask
+
+.maskDone:
+    ; Mark reg 0 and reg 1 (gl_Position / gl_FragColor)
+    lea rdi, [rbp - 128]
+    or byte [rdi + 0], 0x03
+
+    ; Zero registers 2..255 not marked
+    lea rdi, [r12 + VMState.regs]
+    xorps xmm0, xmm0
+    xor r8d, r8d
+
+.zeroLoop:
+    cmp r8d, 256
+    jge .zeroDone
+    cmp r8d, 2
+    jl .zeroSkip
+
+    mov eax, r8d
+    shr eax, 3
+    mov r9d, r8d
+    and r9d, 7
+    mov r10d, 1
+    mov ecx, r9d
+    shl r10d, cl
+    lea rsi, [rbp - 128]
+    test byte [rsi + rax], r10b
+    jnz .zeroSkip
+
+    mov eax, r8d
+    shl eax, 4
+    movups [rdi + rax], xmm0
+.zeroSkip:
+    inc r8d
+    jmp .zeroLoop
+.zeroDone:
+    mov eax, 1
+    add rsp, 152
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    pop rbp
+    ret
+
+; --------------------------------------------
+; _cgxCoreInterpolateVaryings
+; Blend three vertices' varyingVert records by barycentric
+; weights into CGXState.varyingFrag.
+;
+; Input: xmm0 = w0, xmm1 = w1, xmm2 = w2 (weights)
+;       rdi = program ptr
+; Output: eax = 1 ok, 0 fail
+; --------------------------------------------
+_cgxCoreInterpolateVaryings:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    sub rsp, 56
+
+    movss [rbp - 48], xmm0
+    movss [rbp - 52], xmm1
+    movss [rbp - 56], xmm2
+
+    mov r12, rdi                ; program ptr
+    lea r13, [rel _cgxCoreState + CGXState.varyingFrag]
+    lea r14, [rel _cgxCoreState + CGXState.varyingVert]
+    lea r15, [r14 + 128]
+    lea rbx, [r14 + 256]
+
+    mov ecx, [r12 + Program.varyingCount]
+    cmp ecx, 8
+    jle .haveCount
+    mov ecx, 8
+
+.haveCount:
+    xor r8d, r8d
+
+.vLoop:
+    cmp r8d, ecx
+    jge .vDone
+
+    mov eax, r8d
+    shl eax, 4
+    lea rsi, [r14 + rax]
+    lea rdi, [r15 + rax]
+    lea r9, [rbx + rax]
+    lea r10, [r13 + rax]
+
+    movups xmm3, [rsi]
+    movups xmm4, [rdi]
+    movups xmm5, [r9]
+
+    movups xmm6, [rbp - 48]
+    shufps xmm6, xmm6, 0x00
+    mulps xmm3, xmm6
+
+    movups xmm6, [rbp - 52]
+    shufps xmm6, xmm6, 0x00
+    mulps xmm4, xmm6
+
+    movss xmm6, [rbp - 56]
+    shufps xmm6, xmm6, 0x00
+    mulps xmm5, xmm6
+
+    addps xmm3, xmm4
+    addps xmm3, xmm5
+    movups [r10], xmm3
+
+    inc r8d
+    jmp .vLoop
+.vDone:
+    mov eax, 1
+    add rsp, 56
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
+    pop rbp
+    ret
+
+; --------------------------------------------
+; _cgxCoreRunFragmentShader
+; Runs the fragment shader for the current fragment.
+; Assumes varyingFrag is already populated.
+;
+; Input: rdi = program ptr
+; Output: eax = 1 ok, 0 fail
+; --------------------------------------------
+_cgxCoreRunFragmentShader:
+    push rbp
+    mov rbp, rsp
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    sub rsp, 56
+
+    mov r12, rdi
+
+    ; Zero fragment VM registers except uniforms
+    lea rdi, [rel _cgxCoreState + CGXState.fragVM]
+    mov rsi, r12
+    call _cgxCoreInitVMRegs
+
+    ; Load varyings into fragment VM
+    mov r13, [r12 + Program.varyings]
+    mov r14d, [r12 + Program.varyingCount]
+    cmp r14d, 8
+    jle .haveCount
+    mov r14d, 8
+
+.haveCount:
+    xor r15d, r15d
+
+.loadLoop:
+    cmp r15d, r14d
+    jge .loadDone
+
+    mov eax, r15d
+    imul eax, Symbol_size
+    lea rsi, [r13 + rax]
+
+    movzx eax, byte [rsi + Symbol.reg]
+    shl eax, 4
+    lea rdi, [rel _cgxCoreState + CGXState.fragVM + VMState.regs]
+    add rdi, rax
+
+    mov eax, r15d
+    shl eax, 4
+    lea rsi, [rel _cgxCoreState + CGXState.varyingFrag]
+    add rsi, rax
+
+    movups xmm0, [rsi]
+    movups [rdi], xmm0
+
+    inc r15d
+    jmp .loadLoop
+.loadDone:
+    ; Look up fragment shader instr stream
+    mov ecx, [r12 + Program.fragShader]
+    call _cgxCoreShaderFindById
+    test rdi, rdi
+    jz .fail
+
+    mov rdx, [rdi + Shader.instr]
+    mov r8d, [rdi + Shader.instrCount]
+
+    ; Run
+    lea rcx, [rel _cgxCoreState + CGXState.fragVM]
+    call _cgxCoreVMExecute
+
+    ; Read gl_FragColor (reg 1)
+    lea rdi, [rel _cgxCoreState + CGXState.fragVM + VMState.regs]
+    movss xmm0, [rdi + 16 + 0]
+    movss xmm1, [rdi + 16 + 4]
+    movss xmm2, [rdi + 16 + 8]
+    movss xmm3, [rdi + 16 + 12]
+
+    ; Scale rgb to 0..255
+    mov eax, 0x437F0000
+    movd xmm4, eax
+    mulss xmm0, xmm4
+    mulss xmm1, xmm4
+    mulss xmm2, xmm4
+
+    cvttss2si eax, xmm0
+    cmp eax, 0
+    jge .rOk
+    xor eax, eax
+
+.rOk:
+    cmp eax, 255
+    jle .rDone
+    mov eax, 255
+.rDone:
+    mov r8d, eax
+
+    cvttss2si eax, xmm1
+    cmp eax, 0
+    jge .gOk
+    xor eax, eax
+.gOk:
+    cmp eax, 255
+    jle .gDone
+    mov eax, 255
+.gDone:
+    mov r9d, eax
+
+    cvttss2si eax, xmm2
+    cmp eax, 0
+    jge .bOk
+    xor eax, eax
+.bOk:
+    cmp eax, 255
+    jle .bDone
+    mov eax, 255
+.bDone:
+    mov r10d, eax
+
+    mov eax, r8d
+    shl eax, 16
+    mov ecx, r9d
+    shl ecx, 8
+    or eax, ecx
+    or eax, r10d
+    mov [rel _cgxCoreState + CGXState.drawColor], eax
+
+    ; Alpha clamp 0..1
+    xorps xmm4, xmm4
+    comiss xmm3, xmm4
+    jae .aNotNeg
+    xorps xmm3, xmm3
+.aNotNeg:
+    mov eax, 0x3F800000
+    movd xmm4, eax
+    comiss xmm3, xmm4
+    jbe .aNotBig
+    movaps xmm3, xmm4
+.aNotBig:
+    movss [rel _cgxCoreState + CGXState.drawAlpha], xmm3
+    mov eax, 1
+    jmp .done
+
+.fail:
+    xor eax, eax
+.done:
+    add rsp, 56
+    pop r15
+    pop r14
+    pop r13
     pop r12
     pop rbx
     pop rbp
