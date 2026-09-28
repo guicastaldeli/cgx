@@ -195,17 +195,21 @@ _cgxCoreAnalyze:
 ;;;;;;;;;;
 .isGLPosition:
     mov byte [rel _caDebugStage], 10
-
     mov rdi, [rbp - 8]
-    mov dword [rdi + ASTNode.a], 0                          ; symbol index 0 = gl_Position
+    mov dword [rdi + ASTNode.a], 0
     mov dword [rdi + ASTNode.typeId], CGX_TYPE_VEC4
+    mov rsi, [r15 + ParseState.symtab]
+    mov byte [rsi + 0*Symbol_size + Symbol.type], CGX_TYPE_VEC4
+    mov byte [rsi + 0*Symbol_size + Symbol.reg], 0
     jmp .nextNode
 .isGLFragColor:
     mov byte [rel _caDebugStage], 11
-
     mov rdi, [rbp - 8]
-    mov dword [rdi + ASTNode.a], 1                          ; symbol index 1 = gl_FragColor
+    mov dword [rdi + ASTNode.a], 1
     mov dword [rdi + ASTNode.typeId], CGX_TYPE_VEC4
+    mov rsi, [r15 + ParseState.symtab]
+    mov byte [rsi + 1*Symbol_size + Symbol.type], CGX_TYPE_VEC4
+    mov byte [rsi + 1*Symbol_size + Symbol.reg], 1
     jmp .nextNode
 ;;;;;;;;;;
 
@@ -506,7 +510,8 @@ _cgxCoreAnalyze:
 ;;;;;;;;;;
 .assignRegs:
     mov rsi, [r15 + ParseState.symtab]
-    xor eax, eax                                ; symbol index
+    add rsi, 2 * Symbol_size
+    mov eax, 2                                  ; symbol index
     mov ecx, 2                                  ; next free register
 
 .symLoop:

@@ -360,7 +360,8 @@ _cgxCoreParserAddSymbol:
 
     ; Find first free slot
     mov rdx, [rbx + ParseState.symtab]
-    xor ecx, ecx
+    add rdx, 2 * Symbol_size
+    mov ecx, 2
 
 .findFree:
     cmp ecx, CGX_MAX_SYMBOLS
