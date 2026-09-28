@@ -270,10 +270,21 @@ _compileAssign:
 .lhsIdent:
     ; lhs.a = symbol index
     mov eax, [r13 + ASTNode.a]
+    cmp eax, -2
+    je .lhsGLPosition
+    cmp eax, -3
+    je .lhsGLFragColor
     call _getSymbolRegByIdx
     cmp eax, -1
     je .errSymLookup
     mov r14d, eax               ; dest reg
+    jmp .compileRhs
+
+.lhsGLPosition:
+    xor r14d, r14d
+    jmp .compileRhs
+.lhsGLFragColor:
+    mov r14d, 1
     jmp .compileRhs
 
 .errSymLookup:
@@ -445,6 +456,12 @@ _compileExpr:
 .exprIdent:
     mov byte [rel _ccDebugStage], 55
 
+    mov eax, [r12 + ASTNode.a]
+    cmp eax, -2
+    je .exprIdentGLPosition
+    cmp eax, -3
+    je .exprIdentGLFragColor
+
     ; node.a = symbol index
     mov rdi, [rbp - 48]
     mov rsi, [rbp - 56]
@@ -452,6 +469,13 @@ _compileExpr:
     call _getSymbolRegByIdx
     cmp eax, -1
     je .errIdentSym
+    jmp .done
+
+.exprIdentGLPosition:
+    mov eax, 0
+    jmp .done
+.exprIdentGLFragColor:
+    mov eax, 1
     jmp .done
 
 .errIdentSym:

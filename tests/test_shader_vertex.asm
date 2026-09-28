@@ -58,9 +58,9 @@ section .data
 
     ; Triangle in NDC. 3 vertices, each (x, y, z), stride 12.
     vertices:
-        dd -0.5,  0.5, 0.0
-        dd -0.5, -0.5, 0.0
-        dd  0.5, -0.5, 0.0
+        dd -1.0,  0.5, 0.2
+        dd -1.0, -0.5, 0.2
+        dd  1.0, -0.5, 0.2
     vertices_size equ 3 * 12
 
     indices:
@@ -69,7 +69,7 @@ section .data
 
     ; Messages
     msg_d0          db "main entered", 0
-    msg_d1          db "D1: CGXInit 2OK", 0
+    msg_d1          db "D1: CGXInit OK", 0
     msg_d2          db "VS compile failed", 0
     msg_d3          db "FS compile failed", 0
     msg_d4          db "link failed", 0
@@ -225,16 +225,16 @@ main:
     mov edx, [rel fsId]
     call CGXAttachShader
 
-    mov ecx, [rel progId]
-    call CGXLinkProgram
-    test eax, eax
-    jz .linkFail
-
     ; Bind aPos to VAO slot 0
     mov ecx, [rel progId]
     xor edx, edx
     lea r8, [rel aPosName]
     call CGXBindAttribLocation
+
+    mov ecx, [rel progId]
+    call CGXLinkProgram
+    test eax, eax
+    jz .linkFail
 
     ; Create buffers
     ; VBO

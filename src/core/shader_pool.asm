@@ -90,9 +90,11 @@ section .data
     diag_vs_varying             db "vs varying", 0
     diag_bad_symtab             db "bad symtab", 0
     diag_good_symtab            db "good symtab", 0
-        diag_attrib_enter      db "addAttrib: ENTER", 0
-    diag_attrib_beforecopy db "addAttrib: BEFORECOPY", 0
-    diag_attrib_done       db "addAttrib: DONE", 0
+    diag_attrib_enter           db "addAttrib: ENTER", 0
+    diag_attrib_beforecopy      db "addAttrib: BEFORECOPY", 0
+    diag_attrib_done            db "addAttrib: DONE", 0
+    diag_fs_uniform             db "fs uniform", 0
+    diag_fs_varying             db "fs varying", 0
 
 section .bss
     _spTokens                   resb CGX_MAX_TOKENS * Token_size
@@ -1238,29 +1240,42 @@ _cgxCoreProgramLink:
     jmp .vsNext
 
 .vsUniform:
+    mov rsi, [rbp - 56]
+    mov ecx, r12d
+
+    push rcx
+    push rsi
     lea rdx, [rel diag_vs_uniform]
     call _diag
+    pop rsi
+    pop rcx
 
-    ; Add to uniform table with vertReg = symbol.reg, fragReg = 0xFF
-    mov rsi, [rbp - 56]
-    mov ecx, r12d                       ; (preserve program id...)
     call _addUniformFromSymbol
     jmp .vsNext
 .vsAttrib:
     mov rsi, [rbp - 56]
     mov ecx, r12d
     
+    push rcx
+    push rsi
     lea rdx, [rel diag_vs_attrib]
     call _diag
-    
+    pop rsi
+    pop rcx
+
     call _addAttribFromSymbol
     jmp .vsNext
 .vsVarying:
-    lea rdx, [rel diag_vs_varying]
-    call _diag
-
     mov rsi, [rbp - 56]
     mov ecx, r12d
+
+    push rcx
+    push rsi
+    lea rdx, [rel diag_vs_varying]
+    call _diag
+    pop rsi
+    pop rcx
+
     call _addVaryingFromSymbol
     jmp .vsNext
 
@@ -1303,11 +1318,27 @@ _cgxCoreProgramLink:
 .fsUniform:
     mov rsi, [rbp - 56]
     mov ecx, r12d
+
+    push rcx
+    push rsi
+    lea rdx, [rel diag_fs_uniform]
+    call _diag
+    pop rsi
+    pop rcx
+
     call _mergeUniformFromSymbol
     jmp .fsNext
 .fsVarying:
     mov rsi, [rbp - 56]
     mov ecx, r12d
+
+    push rcx
+    push rsi
+    lea rdx, [rel diag_fs_varying]
+    call _diag
+    pop rsi
+    pop rcx
+
     call _mergeVaryingFromSymbol
     jmp .fsNext
 

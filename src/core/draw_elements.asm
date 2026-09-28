@@ -949,7 +949,7 @@ _cgxCoreShaderFetchVertex:
     push rbx
     push r12
     push r15
-    sub rsp, 56
+    sub rsp, 128
 
     mov r12, rdi                    ; RasterVertex*
     mov [rbp - 48], r13             ; VBO
@@ -1148,6 +1148,7 @@ _cgxCoreShaderFetchVertex:
     inc r8d
     ; restore attribCount
     mov ecx, [r15 + Program.attribCount]
+    mov rsi, [r15 + Program.attribs]
     jmp .attribLoop
 .attribDone:
     ; run the vertex VM
@@ -1263,7 +1264,7 @@ _cgxCoreShaderFetchVertex:
     xor eax, eax
 
 .done:
-    add rsp, 56
+    add rsp, 128
     pop r15
     pop r12
     pop rbx
