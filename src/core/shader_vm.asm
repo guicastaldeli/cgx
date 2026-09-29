@@ -13,6 +13,8 @@ default rel
 extern _cgxCoreState
 extern CGXState
 
+extern _cgxCoreTextureSample
+
 global _cgxCoreVMExecute
 global _cgxCoreVMReset
 
@@ -393,7 +395,10 @@ _cgxCoreVMExecute:
 ;;;;;;;;;;
 ; TEXTURE2D
 ; dst = texture2D(sampler[srcA], srcB.xy)
-; Uses the texture system
+;
+; Reads UV from srcB (.x, .y) samples the globally bound
+; texture, and stores the texel converted to a float vec4
+; (each channel 0..1) into dst
 ;;;;;;;;;;
 .opTexture2D:
     mov eax, [rbx + Instr.dst]
@@ -407,14 +412,48 @@ _cgxCoreVMExecute:
     movss xmm0, [rsi]                       ; .x = u
     movss xmm1, [rsi + 4]                   ; .y = v
 
-    ; Sampler: srcA holds the unit index (on int in .x)
-    mov ecx, [rbx + Instr.srcA]
-    shl ecx, 4
-    lea rsi, [r12 + VMState.regs + rcx]
+    call _cgxCoreTextureSample
 
-    mov eax, 0x3F800000
-    movd xmm2, eax
-    shufps xmm2, xmm2, 0x00
+    test eax, eax
+    jz .texWhiteOrBlack
+
+    ; Extract bytes
+    mov ecx, eax
+    and ecx, 0xFF               ; B
+    cvtsi2ss xmm4, ecx
+    mov ecx, eax
+    shr ecx, 8
+    and ecx, 0xFF               ; G
+    cvtsi2ss xmm5, ecx
+    mov ecx, eax
+    shr ecx, 16
+    and ecx, 0xFF               ; R
+    cvtsi2ss xmm6, ecx
+    mov ecx, eax
+    shr ecx, 24
+    and ecx, 0xFF               ; A
+    cvtsi2ss xmm7, ecx
+
+    ; Divide each by 255.0
+    mov eax, 0x437F0000              ; 255.0f
+    movd xmm3, eax
+    divss xmm4, xmm3                 ; B
+    divss xmm5, xmm3                 ; G
+    divss xmm6, xmm3                 ; R
+    divss xmm7, xmm3                 ; A
+
+    ; Pack into (R, G, B, A) = xmm2
+    unpcklps xmm6, xmm5             ; (R, G, ?, ?)
+    unpcklps xmm4, xmm7             ; (B, A, ?, ?)
+    movlhps xmm6, xmm4              ; (R, G, B, A)
+    movaps xmm2, xmm6
+
+    jmp .texStore
+
+.texWhiteOrBlack:
+    xorps xmm2, xmm2                ; (0, 0, 0, 0)
+
+.texStore:
     mov eax, [rbx + Instr.dst]
     shl eax, 4
     lea rdi, [r12 + VMState.regs + rax]

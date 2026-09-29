@@ -1015,18 +1015,74 @@ _compileExpr:
 
 ;;;;;;;;;;
 ; texture2D(s, uv)
+;
+; node.b = args pool base, node.c = arg count (must be 2)
+; Arg 0 = sampler (a sampler2D uniform), arg 1 = vec2 UV.
 ;;;;;;;;;;
 .callTexture2D:
     mov byte [rel _ccDebugStage], 68
 
-    ; temporary
+    mov r13d, [r12 + ASTNode.b]
+    mov r14d, [r12 + ASTNode.c]
+
+    cmp r14d, 2
+    jne .errTexArgs
+
+    ; Get the args pool
+    call _cgxCoreParserGetArgPool
+    mov [rbp - 164], rax
+
+    ; Compile arg 0: sampler
+    mov eax, r13d
+    mov rsi, [rbp - 164]
+    mov eax, [rsi + rax * 4]            ; AST node index
+    mov rcx, [rbp - 48]                 ; ast
+    mov edx, eax
+    mov r8, [rbp - 56]
+    call _compileExpr
+    cmp eax, -1
+    je .errTexArgs
+    mov [rbp - 168], eax                ; sampler reg
+
+    ; Compiler arg 1: UV
+    mov eax, r13d
+    inc eax
+    mov rsi, [rbp - 164]
+    mov eax, [rsi + rax * 4]
+    mov rcx, [rbp - 48]
+    mov edx, eax
+    mov r8, [rbp - 56]
+    call _compileExpr
+    cmp eax, -1
+    je .errTexArgs
+    mov [rbp - 172], eax                ; uv reg
+
+    ; Alloc dest
     call _allocTemp
     cmp eax, -1
     je .errTexTemp
+    mov [rbp - 176], eax                ; dst reg
+    
+    ; Emit TEXTURE2D dst, sampler, uv
+    mov ecx, CGX_OP_TEXTURE2D
+    mov edx, [rbp - 176]                ; dst
+    mov r8d, [rbp - 168]                ; srcA = sampler reg
+    mov r9d, [rbp - 172]                ; srcB = uv reg
+    call _emit
+    cmp eax, -1
+    je .errTexEmit
+
+    mov eax, [rbp - 176]
     jmp .done
 
-.errTexTemp:
+.errTexArgs:
     mov byte [rel _ccDebugStage], 69
+    jmp .fail
+.errTexTemp:
+    mov byte [rel _ccDebugStage], 70
+    jmp .fail
+.errTexEmit:
+    mov byte [rel _ccDebugStage], 71
     jmp .fail
 
 ;;;;;;;;;;
